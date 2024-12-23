@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../config/firebase';
 import { List } from '../types/list';
+import { useNotifications } from './useNotifications';
 import {
   collection,
   query,
@@ -15,8 +16,6 @@ import {
   Timestamp,
   DocumentData,
   getDoc,
-  getDocs,
-  or,
 } from 'firebase/firestore';
 
 interface FirestoreList extends DocumentData {
@@ -48,6 +47,7 @@ export function useLists(): UseListsReturn {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
+  const { createNotification } = useNotifications();
 
   useEffect(() => {
     if (!user) {
@@ -59,18 +59,24 @@ export function useLists(): UseListsReturn {
     setLoading(true);
     setError(null);
 
-    // Busca listas onde o usuário é dono ou está compartilhado
+    // Busca todas as listas
     const q = query(
       collection(db, 'lists'),
-      or(
-        where('owner', '==', user.email),
-        where('sharedWith', 'array-contains', { email: user.email })
-      )
+      where('owner', '==', user.email)
     );
 
-    const unsubscribe = onSnapshot(q, 
+    // Busca listas compartilhadas
+    const sharedQ = query(
+      collection(db, 'lists'),
+      where('sharedWith', 'array-contains', { email: user.email })
+    );
+
+    let allLists: List[] = [];
+
+    // Inscreve-se para atualizações das listas do usuário
+    const unsubscribeOwner = onSnapshot(q, 
       (snapshot) => {
-        const listsData = snapshot.docs.map(doc => {
+        const ownerLists = snapshot.docs.map(doc => {
           const data = doc.data() as FirestoreList;
           return {
             id: doc.id,
@@ -86,8 +92,8 @@ export function useLists(): UseListsReturn {
             todos: data.todos || [],
           } as List;
         });
-        setLists(listsData);
-        setLoading(false);
+        allLists = [...ownerLists];
+        setLists(allLists);
       },
       (error) => {
         console.error('Error fetching lists:', error);
@@ -96,7 +102,40 @@ export function useLists(): UseListsReturn {
       }
     );
 
-    return () => unsubscribe();
+    // Inscreve-se para atualizações das listas compartilhadas
+    const unsubscribeShared = onSnapshot(sharedQ,
+      (snapshot) => {
+        const sharedLists = snapshot.docs.map(doc => {
+          const data = doc.data() as FirestoreList;
+          return {
+            id: doc.id,
+            name: data.name,
+            color: data.color,
+            icon: data.icon,
+            owner: data.owner,
+            sharedWith: data.sharedWith?.map(share => ({
+              ...share,
+              addedAt: share.addedAt.toDate(),
+            })) || [],
+            createdAt: data.createdAt.toDate(),
+            todos: data.todos || [],
+          } as List;
+        });
+        allLists = [...allLists, ...sharedLists];
+        setLists(allLists);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Error fetching shared lists:', error);
+        setError('Failed to load lists. Please try again later.');
+        setLoading(false);
+      }
+    );
+
+    return () => {
+      unsubscribeOwner();
+      unsubscribeShared();
+    };
   }, [user]);
 
   const createList = async (name: string, color: string, icon: string) => {
@@ -208,12 +247,25 @@ export function useLists(): UseListsReturn {
         throw new Error('Esta lista já foi compartilhada com este usuário');
       }
 
+      // Atualiza a lista com o novo compartilhamento
       await updateDoc(listRef, {
         sharedWith: arrayUnion({
           email,
           permission,
           addedAt: Timestamp.now(),
         }),
+      });
+
+      // Cria uma notificação para o usuário que recebeu o compartilhamento
+      await createNotification({
+        type: 'list_shared',
+        title: 'Nova lista compartilhada',
+        message: `${user.email} compartilhou a lista "${listData.name}" com você`,
+        recipientEmail: email,
+        data: {
+          listId,
+          senderId: user.uid,
+        },
       });
     } catch (error) {
       console.error('Error sharing list:', error);
