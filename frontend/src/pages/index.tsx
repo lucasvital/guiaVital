@@ -1,19 +1,18 @@
 'use client'
 
-import React, { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { Header } from '../components/features/Header';
-import { FilterMenu } from '../components/features/FilterMenu';
-import { Todo } from '../types/todo';
+import { useState } from 'react';
 import { Plus, Search, FileText } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
+import { Header } from '../components/features/Header';
+import { FilterMenu } from '../components/features/FilterMenu';
+import { AddTodo } from '../components/features/AddTodo';
+import { Templates } from '../components/features/Templates';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { TodoCard } from '../components/features/TodoCard';
 import { useTodos } from '../hooks/useTodos';
+import { useAuth } from '../contexts/AuthContext';
 import { Priority } from '../types/todo';
-import { AddTodo } from '../components/features/AddTodo';
-import { Templates } from '../components/features/Templates';
 
 interface Filters {
   priority: Priority;
@@ -52,8 +51,8 @@ export default function TodoList() {
 
   const sortedTodos = [...filteredTodos].sort((a, b) => {
     if (sortBy === 'priority') {
-      const priorityOrder = { high: 3, medium: 2, low: 1 };
-      return priorityOrder[b.priority.toLowerCase() as keyof typeof priorityOrder] - priorityOrder[a.priority.toLowerCase() as keyof typeof priorityOrder];
+      const priorityOrder = { HIGH: 3, MEDIUM: 2, LOW: 1 };
+      return priorityOrder[b.priority] - priorityOrder[a.priority];
     }
     if (sortBy === 'dueDate') {
       if (!a.dueDate) return 1;
@@ -98,9 +97,8 @@ export default function TodoList() {
               />
             </div>
             <FilterMenu
-              filter={filter}
               onFilterChange={(filters: Filters) => {
-                setFilter(filters.priority === 'LOW' ? 'ALL' : 'ACTIVE');
+                setFilter(filters.priority === 'LOW' ? 'COMPLETED' : 'ACTIVE');
               }}
               sortBy={sortBy}
               onSortChange={setSortBy}
@@ -119,7 +117,7 @@ export default function TodoList() {
                 <DialogHeader>
                   <DialogTitle>Templates</DialogTitle>
                 </DialogHeader>
-                <Templates onClose={() => setIsTemplatesOpen(false)} />
+                <Templates onOpenChange={setIsTemplatesOpen} />
               </DialogContent>
             </Dialog>
             <Dialog open={isAddTodoOpen} onOpenChange={setIsAddTodoOpen}>
@@ -133,7 +131,7 @@ export default function TodoList() {
                 <DialogHeader>
                   <DialogTitle>Add Task</DialogTitle>
                 </DialogHeader>
-                <AddTodo onClose={() => setIsAddTodoOpen(false)} />
+                <AddTodo onOpenChange={setIsAddTodoOpen} />
               </DialogContent>
             </Dialog>
           </div>
