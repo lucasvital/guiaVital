@@ -1,0 +1,68 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Funções auxiliares
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(resource) {
+      return isSignedIn() && resource.data.owner == request.auth.token.email;
+    }
+
+    function isCollaborator(resource) {
+      return isSignedIn() && resource.data.sharedWith.hasAny([request.auth.token.email]);
+    }
+
+    // Regras para listas
+    match /lists/{listId} {
+      // Qualquer um pode ler se for dono ou colaborador
+      allow read: if isSignedIn() && (isOwner(resource) || isCollaborator(resource));
+      // Apenas o dono pode criar
+      allow create: if isSignedIn() && request.resource.data.owner == request.auth.token.email;
+      // Apenas o dono pode excluir
+      allow delete: if isOwner(resource);
+      // Dono pode atualizar tudo, colaborador só alguns campos
+      allow update: if isOwner(resource) || 
+        (isCollaborator(resource) && 
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['lastModified', 'updatedAt']));
+    }
+
+    // Regras para tarefas
+    match /todos/{todoId} {
+      function getList() {
+        return get(/databases/$(database)/documents/lists/$(resource.data.list));
+      }
+
+      // Pode ler se tiver acesso à lista
+      allow read: if isSignedIn() && (
+        isOwner(getList()) || isCollaborator(getList())
+      );
+
+      // Pode criar se tiver acesso à lista
+      allow create: if isSignedIn() && (
+        isOwner(getList()) || isCollaborator(getList())
+      );
+
+      // Apenas o criador da tarefa pode excluir
+      allow delete: if isSignedIn() && resource.data.createdBy == request.auth.token.email;
+
+      // Criador pode fazer qualquer atualização, colaborador só pode marcar como concluído
+      allow update: if isSignedIn() && (
+        resource.data.createdBy == request.auth.token.email ||
+        (isCollaborator(getList()) && 
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['completed', 'completedAt']))
+      );
+    }
+
+    // Regras para notificações
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && resource.data.toEmail == request.auth.token.email;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource.data.toEmail == request.auth.token.email;
+      allow delete: if isSignedIn() && resource.data.toEmail == request.auth.token.email;
+    }
+  }
+}
