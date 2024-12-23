@@ -13,7 +13,22 @@ import {
   deleteDoc,
   arrayUnion,
   Timestamp,
+  DocumentData,
 } from 'firebase/firestore';
+
+interface FirestoreList extends DocumentData {
+  name: string;
+  color: string;
+  icon?: string;
+  owner: string;
+  sharedWith?: Array<{
+    email: string;
+    permission: 'read' | 'write' | 'admin';
+    addedAt: Timestamp;
+  }>;
+  createdAt: Timestamp;
+  todos?: any[];
+}
 
 interface UseListsReturn {
   lists: List[];
@@ -49,18 +64,18 @@ export function useLists(): UseListsReturn {
     const unsubscribe = onSnapshot(q, 
       (snapshot) => {
         const listsData = snapshot.docs.map(doc => {
-          const data = doc.data();
+          const data = doc.data() as FirestoreList;
           return {
             id: doc.id,
             name: data.name,
             color: data.color,
             icon: data.icon,
             owner: data.owner,
-            sharedWith: data.sharedWith?.map((share: any) => ({
+            sharedWith: data.sharedWith?.map(share => ({
               ...share,
-              addedAt: share.addedAt?.toDate(),
+              addedAt: share.addedAt.toDate(),
             })) || [],
-            createdAt: data.createdAt?.toDate(),
+            createdAt: data.createdAt.toDate(),
             todos: data.todos || [],
           } as List;
         });

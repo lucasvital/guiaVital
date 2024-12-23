@@ -51,7 +51,7 @@ export default function TodoList() {
 
   const sortedTodos = [...filteredTodos].sort((a, b) => {
     if (sortBy === 'priority') {
-      const priorityOrder = { HIGH: 3, MEDIUM: 2, LOW: 1 };
+      const priorityOrder = { high: 3, medium: 2, low: 1, HIGH: 3, MEDIUM: 2, LOW: 1 };
       return priorityOrder[b.priority] - priorityOrder[a.priority];
     }
     if (sortBy === 'dueDate') {
@@ -98,7 +98,7 @@ export default function TodoList() {
             </div>
             <FilterMenu
               onFilterChange={(filters: Filters) => {
-                setFilter(filters.priority === 'LOW' ? 'COMPLETED' : 'ACTIVE');
+                setFilter(filters.priority === 'low' ? 'COMPLETED' : 'ACTIVE');
               }}
               sortBy={sortBy}
               onSortChange={setSortBy}
@@ -117,7 +117,7 @@ export default function TodoList() {
                 <DialogHeader>
                   <DialogTitle>Templates</DialogTitle>
                 </DialogHeader>
-                <Templates onOpenChange={setIsTemplatesOpen} />
+                <Templates />
               </DialogContent>
             </Dialog>
             <Dialog open={isAddTodoOpen} onOpenChange={setIsAddTodoOpen}>
@@ -131,7 +131,7 @@ export default function TodoList() {
                 <DialogHeader>
                   <DialogTitle>Add Task</DialogTitle>
                 </DialogHeader>
-                <AddTodo onOpenChange={setIsAddTodoOpen} />
+                <AddTodo />
               </DialogContent>
             </Dialog>
           </div>

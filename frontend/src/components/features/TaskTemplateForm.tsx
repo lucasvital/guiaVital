@@ -5,7 +5,7 @@ import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { useAuth } from '../../contexts/AuthContext';
 import { TaskTemplate, TemplateTask } from '../../types';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 
 interface TaskTemplateFormProps {
@@ -29,23 +29,26 @@ export function TaskTemplateForm({ onSubmit, onCancel }: TaskTemplateFormProps) 
     if (!user) return;
 
     try {
+      const now = Timestamp.now().toDate();
       const template: Omit<TaskTemplate, 'id'> = {
         name,
         description,
         tasks,
         createdBy: user.uid,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        createdAt: now,
+        updatedAt: now,
       };
 
-      const docRef = await addDoc(collection(db, 'taskTemplates'), template);
+      const docRef = await addDoc(collection(db, 'taskTemplates'), {
+        ...template,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
       
       if (onSubmit) {
         onSubmit({
           ...template,
           id: docRef.id,
-          createdAt: new Date(),
-          updatedAt: new Date(),
         });
       }
     } catch (error) {

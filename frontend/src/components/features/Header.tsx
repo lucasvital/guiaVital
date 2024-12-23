@@ -72,7 +72,7 @@ export function Header() {
         <div className="flex flex-1 items-center justify-end space-x-2">
           <nav className="flex items-center space-x-2">
             {user && <NotificationBell />}
-            <UserAvatar />
+            {user && <UserAvatar user={user} />}
             <AuthButton />
           </nav>
         </div>
@@ -84,7 +84,7 @@ export function Header() {
           <DialogHeader>
             <DialogTitle>Pomodoro Timer</DialogTitle>
           </DialogHeader>
-          <PomodoroTimer onClose={() => setShowPomodoro(false)} />
+          <PomodoroTimer />
         </DialogContent>
       </Dialog>
 
@@ -96,7 +96,6 @@ export function Header() {
           <ListManager 
             selectedListId={selectedListId} 
             onSelectList={handleSelectList} 
-            onClose={() => setShowListManager(false)}
           />
         </DialogContent>
       </Dialog>

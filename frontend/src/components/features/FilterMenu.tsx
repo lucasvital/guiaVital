@@ -15,6 +15,8 @@ import { Priority } from '../../types/todo';
 
 interface FilterMenuProps {
   onFilterChange: (filters: Filters) => void;
+  sortBy: 'priority' | 'dueDate' | 'createdAt';
+  onSortChange: (sort: 'priority' | 'dueDate' | 'createdAt') => void;
 }
 
 interface Filters {
@@ -35,7 +37,7 @@ const initialFilters: Filters = {
   }
 };
 
-export function FilterMenu({ onFilterChange }: FilterMenuProps) {
+export function FilterMenu({ onFilterChange, sortBy, onSortChange }: FilterMenuProps) {
   const [open, setOpen] = useState(false);
   const [filters, setFilters] = useState<Filters>(initialFilters);
 

@@ -97,7 +97,9 @@ export function ListForm({ onSubmit, onCancel }: ListFormProps) {
                 variant="outline"
                 className="w-[100px] h-[40px]"
                 style={{ backgroundColor: color }}
-              />
+              >
+                &nbsp;
+              </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0">
               <ChromePicker

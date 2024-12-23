@@ -22,7 +22,6 @@ interface Template {
 
 export function Templates() {
   const [templates, setTemplates] = useState<Template[]>([]);
-  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [newTemplate, setNewTemplate] = useState<Partial<Template>>({
     name: '',
     description: '',
@@ -40,7 +39,10 @@ export function Templates() {
       ...prev,
       tasks: [
         ...(prev.tasks || []),
-        { title: newTask.title, priority: newTask.priority || 'medium' }
+        { 
+          title: newTask.title!, 
+          priority: newTask.priority || 'medium' 
+        } as TemplateTask
       ],
     }));
 
@@ -78,7 +80,7 @@ export function Templates() {
       <TabsContent value="browse">
         <div className="grid gap-4">
           {templates.map((template) => (
-            <Card key={template.id} className="cursor-pointer hover:bg-accent/50" onClick={() => setSelectedTemplate(template)}>
+            <Card key={template.id} className="cursor-pointer hover:bg-accent/50" onClick={() => setTemplates(templates.filter(t => t.id !== template.id))}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="h-4 w-4" />

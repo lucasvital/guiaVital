@@ -26,12 +26,18 @@ const priorityColors = {
   low: 'bg-blue-500',
   medium: 'bg-yellow-500',
   high: 'bg-red-500',
+  LOW: 'bg-blue-500',
+  MEDIUM: 'bg-yellow-500',
+  HIGH: 'bg-red-500',
 };
 
 const priorityLabels = {
   low: 'Baixa',
   medium: 'Média',
   high: 'Alta',
+  LOW: 'Baixa',
+  MEDIUM: 'Média',
+  HIGH: 'Alta',
 };
 
 export function TodoCard({

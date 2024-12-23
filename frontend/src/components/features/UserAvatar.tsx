@@ -16,6 +16,13 @@ export function UserAvatar({ user, showUploadButton = false, onUpload }: UserAva
     ? user.email.substring(0, 2).toUpperCase()
     : '??';
 
+  const handleFileChange = (e: Event) => {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (file && onUpload) {
+      onUpload();
+    }
+  };
+
   return (
     <div className="relative">
       <Avatar>
@@ -32,12 +39,7 @@ export function UserAvatar({ user, showUploadButton = false, onUpload }: UserAva
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = 'image/*';
-            input.onchange = (e) => {
-              const file = (e.target as HTMLInputElement).files?.[0];
-              if (file && onUpload) {
-                onUpload(file);
-              }
-            };
+            input.onchange = handleFileChange;
             input.click();
           }}
         >

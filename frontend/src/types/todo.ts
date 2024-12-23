@@ -1,6 +1,6 @@
 import { Timestamp } from 'firebase/firestore';
 
-export type Priority = 'low' | 'medium' | 'high';
+export type Priority = 'low' | 'medium' | 'high' | 'LOW' | 'MEDIUM' | 'HIGH';
 
 export interface Category {
   id: string;
@@ -39,6 +39,20 @@ export interface Todo {
   userId: string;
   createdAt: Date;
   updatedAt?: Date;
+}
+
+export interface List {
+  id: string;
+  name: string;
+  color: string;
+  icon?: string;
+  createdBy: string;
+  owner: string;
+  sharedWith: string[];
+  members?: string[];
+  createdAt: Date;
+  updatedAt?: Date;
+  todos?: Todo[];
 }
 
 export interface TodoList {

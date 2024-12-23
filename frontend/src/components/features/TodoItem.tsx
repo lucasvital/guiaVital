@@ -24,6 +24,9 @@ export function TodoItem({ todo, onToggle, onDelete }: TodoItemProps) {
     high: 'text-red-500',
     medium: 'text-yellow-500',
     low: 'text-blue-500',
+    HIGH: 'text-red-500',
+    MEDIUM: 'text-yellow-500',
+    LOW: 'text-blue-500',
   }[todo.priority];
 
   return (

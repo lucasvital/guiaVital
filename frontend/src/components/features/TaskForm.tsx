@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -8,11 +8,7 @@ import { Priority } from '../../types/todo';
 import {
   addDoc,
   collection,
-  getDocs,
-  query,
-  where,
   serverTimestamp,
-  Timestamp,
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
@@ -37,7 +33,7 @@ interface Task {
   categoryId?: string;
   assignedTo?: string[];
   templateId?: string;
-  createdBy: string;
+  createdBy?: string;
   createdAt: any;
   updatedAt: any;
 }

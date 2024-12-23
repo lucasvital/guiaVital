@@ -147,7 +147,7 @@ export function useTodos() {
     try {
       const firestoreTodo = convertTodoToFirestore({
         ...todo,
-        ownerId: user.uid,
+        userId: user.uid,
         completed: false,
         createdAt: new Date(),
         updatedAt: new Date(),
