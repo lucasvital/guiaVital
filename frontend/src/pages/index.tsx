@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
 import { Header } from '../components/features/Header';
 import { FilterMenu } from '../components/features/FilterMenu';
 import { ListManager } from '../components/features/ListManager';

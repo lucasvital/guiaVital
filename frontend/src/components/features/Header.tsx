@@ -64,11 +64,7 @@ export function Header() {
             )}
           </div>
           <nav className="flex items-center">
-            {user ? (
-              <UserAvatar user={user} />
-            ) : (
-              <AuthButton />
-            )}
+            <AuthButton />
           </nav>
         </div>
       </div>

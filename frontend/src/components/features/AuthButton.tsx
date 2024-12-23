@@ -8,54 +8,82 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
-import { MouseEvent } from 'react';
+import { MouseEvent, useEffect } from 'react';
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
 export function AuthButton() {
-  const { user, signInWithGoogle, signOut } = useAuth();
+  console.log('AuthButton rendering...');
+  
+  try {
+    const { user, auth, signOut } = useAuth();
+    console.log('AuthButton hooks loaded, user:', user);
 
-  const handleSignIn = async (e: MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    try {
-      await signInWithGoogle();
-    } catch (error) {
-      console.error('Error signing in:', error);
+    useEffect(() => {
+      console.log('AuthButton mounted, user state:', user);
+    }, [user]);
+
+    const handleSignOut = async (e: MouseEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      try {
+        await signOut();
+        console.log('Sign-out successful!');
+      } catch (error) {
+        console.error('Error signing out:', error);
+        if (error instanceof Error) {
+          alert(`Error signing out: ${error.message}`);
+        } else {
+          alert('An unknown error occurred while signing out');
+        }
+      }
+    };
+
+    console.log('Rendering AuthButton with user:', user);
+
+    if (!user) {
+      return (
+        <Button 
+          variant="outline" 
+          onClick={() => {
+            console.log('Button clicked directly!');
+            const provider = new GoogleAuthProvider();
+            signInWithPopup(auth, provider)
+              .then((result) => {
+                console.log('Sign in successful:', result);
+              })
+              .catch((error) => {
+                console.error('Sign in error:', error);
+                alert(error.message);
+              });
+          }}
+        >
+          <LogIn className="mr-2 h-4 w-4" />
+          Entrar com Google
+        </Button>
+      );
     }
-  };
 
-  const handleSignOut = async (e: MouseEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    try {
-      await signOut();
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
-  };
-
-  if (!user) {
     return (
-      <Button variant="outline" onClick={handleSignIn}>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+            <UserAvatar user={user} showUploadButton={false} />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={handleSignOut}>
+            <LogOut className="mr-2 h-4 w-4" />
+            <span>Sair</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  } catch (error) {
+    console.error('Error in AuthButton:', error);
+    return (
+      <Button variant="outline" disabled>
         <LogIn className="mr-2 h-4 w-4" />
-        Entrar com Google
+        Error Loading Auth
       </Button>
     );
   }
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-          <UserAvatar user={user} showUploadButton={false} />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem
-          onClick={handleSignOut}
-          className="text-red-500 focus:text-red-500"
-        >
-          <LogOut className="mr-2 h-4 w-4" />
-          Sair
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
 }

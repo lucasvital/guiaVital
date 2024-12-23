@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, DocumentData } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { useAuth } from './useAuth';
+import { useAuth } from '../contexts/AuthContext';
 import { Category } from '../types/todo';
 
 interface FirestoreCategory {

@@ -8,7 +8,7 @@ import {
   CollectionReference,
   QueryDocumentSnapshot 
 } from 'firebase/firestore';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth } from '../../contexts/AuthContext';
 import {
   Select,
   SelectContent,

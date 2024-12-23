@@ -1,4 +1,4 @@
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
 import { useTodos } from '../hooks/useTodos';
 import { useTheme } from '../hooks/useTheme';
 import { UserAvatar } from '../components/features/UserAvatar';

@@ -31,12 +31,15 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  console.log('AuthProvider initializing...');
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    console.log('Setting up auth state listener...');
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      console.log('Auth state changed:', user);
       setUser(user);
       setLoading(false);
     });
@@ -147,12 +150,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signInWithGoogle = async () => {
+    console.log('Creating Google Auth Provider...');
     const provider = new GoogleAuthProvider();
+    console.log('Provider created:', provider);
     try {
+      console.log('Attempting to sign in with Google...');
       const result = await signInWithPopup(auth, provider);
+      console.log('Google sign-in successful, user:', result.user);
       setUser(result.user);
     } catch (error) {
-      console.error('Error signing in with Google:', error);
+      console.error('Error in signInWithGoogle:', error);
+      if (error instanceof Error) {
+        setError(error.message);
+        console.error('Error details:', {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        });
+      } else {
+        setError('Failed to sign in with Google');
+        console.error('Unknown error type:', error);
+      }
       throw error;
     }
   };
