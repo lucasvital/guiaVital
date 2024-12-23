@@ -5,11 +5,11 @@ import { X } from 'lucide-react';
 import { Tag } from '../../types/todo';
 
 export interface TagManagerProps {
-  selectedTags: Tag[];
-  onTagsChange: (tags: Tag[]) => void;
+  tags: Tag[];
+  onChange: (tags: Tag[]) => void;
 }
 
-export function TagManager({ selectedTags, onTagsChange }: TagManagerProps) {
+export function TagManager({ tags, onChange }: TagManagerProps) {
   const [newTag, setNewTag] = useState('');
   const [newColor, setNewColor] = useState('#3b82f6'); // default blue color
 
@@ -17,19 +17,19 @@ export function TagManager({ selectedTags, onTagsChange }: TagManagerProps) {
     if (!newTag.trim()) return;
     
     const tagName = newTag.trim().toLowerCase();
-    if (!selectedTags.some(tag => tag.name === tagName)) {
+    if (!tags.some(tag => tag.name === tagName)) {
       const newTagObj: Tag = {
         id: crypto.randomUUID(),
         name: tagName,
         color: newColor
       };
-      onTagsChange([...selectedTags, newTagObj]);
+      onChange([...tags, newTagObj]);
     }
     setNewTag('');
   };
 
   const handleRemoveTag = (tagId: string) => {
-    onTagsChange(selectedTags.filter(tag => tag.id !== tagId));
+    onChange(tags.filter(tag => tag.id !== tagId));
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -67,7 +67,7 @@ export function TagManager({ selectedTags, onTagsChange }: TagManagerProps) {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {selectedTags.map((tag) => (
+        {tags.map((tag) => (
           <span
             key={tag.id}
             className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-sm"

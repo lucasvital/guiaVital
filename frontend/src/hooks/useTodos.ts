@@ -2,12 +2,15 @@ import { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc, Timestamp, DocumentData } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { Todo, Priority } from '../types/todo';
+import { Priority } from '../types/todo';
 
-interface FirestoreTodo {
+interface Todo {
+  id: string;
   title: string;
   description?: string;
   completed: boolean;
+  dueDate?: Date;
+  reminder?: Date;
   priority: Priority;
   listId?: string;
   categoryId?: string;
@@ -22,43 +25,80 @@ interface FirestoreTodo {
     completed: boolean;
   }>;
   userId: string;
-  createdAt: Timestamp;
-  updatedAt?: Timestamp;
+  createdAt: Date;
+  updatedAt?: Date;
+}
+
+interface FirestoreTodo {
+  text: string;
+  description?: string;
+  completed: boolean;
   dueDate?: Timestamp;
   reminder?: Timestamp;
+  priority: Priority;
+  list?: string;
+  categoryId?: string;
+  tags: Array<{
+    id: string;
+    name: string;
+    color: string;
+  }>;
+  subTasks: Array<{
+    id: string;
+    text: string;
+    completed: boolean;
+  }>;
+  ownerId: string;
+  createdAt: Timestamp;
+  updatedAt?: Timestamp;
 }
 
 const convertFirestoreToTodo = (doc: DocumentData): Todo => {
-  const data = doc.data() as FirestoreTodo;
+  const data = doc.data();
+  console.log('Converting Firestore doc:', doc.id, data);
+  
   return {
     id: doc.id,
-    title: data.title,
-    description: data.description,
-    completed: data.completed,
-    priority: data.priority,
-    dueDate: data.dueDate?.toDate(),
-    reminder: data.reminder?.toDate(),
-    listId: data.listId,
-    categoryId: data.categoryId,
+    title: data.text || '', 
+    description: data.description || '',
+    completed: data.completed || false,
+    dueDate: data.dueDate?.toDate() || null,
+    reminder: data.reminder?.toDate() || null,
+    priority: data.priority || 'MEDIUM',
+    listId: data.list || null, 
+    categoryId: data.categoryId || null,
     tags: data.tags || [],
-    subtasks: data.subtasks || [],
-    userId: data.userId,
-    createdAt: data.createdAt.toDate(),
-    updatedAt: data.updatedAt?.toDate(),
+    subtasks: data.subTasks || [], 
+    userId: data.ownerId || '', 
+    createdAt: data.createdAt?.toDate() || new Date(),
+    updatedAt: data.updatedAt?.toDate() || null,
   };
 };
 
 const convertTodoToFirestore = (todo: Partial<Todo>): Partial<FirestoreTodo> => {
+  console.log('Converting todo to Firestore:', todo);
+  
   const firestoreTodo: Partial<FirestoreTodo> = {
-    ...todo,
-    dueDate: todo.dueDate ? Timestamp.fromDate(todo.dueDate) : undefined,
-    reminder: todo.reminder ? Timestamp.fromDate(todo.reminder) : undefined,
+    text: todo.title || '', 
+    description: todo.description,
+    completed: todo.completed || false,
+    priority: todo.priority || 'MEDIUM',
+    ownerId: todo.userId, 
+    list: todo.listId, 
+    subTasks: todo.subtasks || [], 
+    tags: todo.tags || [],
     createdAt: todo.createdAt ? Timestamp.fromDate(todo.createdAt) : Timestamp.now(),
-    updatedAt: Timestamp.now(),
   };
 
-  // Remove id as it's stored separately
-  delete (firestoreTodo as any).id;
+  if (todo.dueDate) {
+    firestoreTodo.dueDate = Timestamp.fromDate(todo.dueDate);
+  }
+  if (todo.reminder) {
+    firestoreTodo.reminder = Timestamp.fromDate(todo.reminder);
+  }
+  if (todo.updatedAt) {
+    firestoreTodo.updatedAt = Timestamp.fromDate(todo.updatedAt);
+  }
   
   return firestoreTodo;
 };
@@ -76,9 +116,12 @@ export function useTodos() {
       return;
     }
 
+    setLoading(true);
+    setError(null);
+
     const q = query(
       collection(db, 'todos'),
-      where('userId', '==', user.uid)
+      where('ownerId', '==', user.uid)
     );
 
     const unsubscribe = onSnapshot(
@@ -89,7 +132,8 @@ export function useTodos() {
         setLoading(false);
       },
       (error) => {
-        setError(error.message);
+        console.error('Error fetching todos:', error);
+        setError('Failed to load todos. Please try again later.');
         setLoading(false);
       }
     );
@@ -98,66 +142,67 @@ export function useTodos() {
   }, [user]);
 
   const addTodo = async (todo: Partial<Todo>) => {
-    try {
-      if (!user) throw new Error('User not authenticated');
+    if (!user) throw new Error('Must be logged in to add a todo');
 
-      const todoData = {
-        ...convertTodoToFirestore(todo),
-        userId: user.uid,
+    try {
+      const firestoreTodo = convertTodoToFirestore({
+        ...todo,
+        ownerId: user.uid,
         completed: false,
-        priority: todo.priority || 'medium',
-        tags: todo.tags || [],
-        subtasks: todo.subtasks || [],
-      };
-
-      await addDoc(collection(db, 'todos'), todoData);
-    } catch (error) {
-      if (error instanceof Error) {
-        setError(error.message);
-      } else {
-        setError('Error adding todo');
-      }
-    }
-  };
-
-  const toggleTodo = async (id: string, completed: boolean) => {
-    try {
-      const todoRef = doc(db, 'todos', id);
-      await updateDoc(todoRef, {
-        completed,
-        updatedAt: Timestamp.now()
+        createdAt: new Date(),
+        updatedAt: new Date(),
       });
+
+      await addDoc(collection(db, 'todos'), firestoreTodo);
     } catch (error) {
-      if (error instanceof Error) {
-        setError(error.message);
-      } else {
-        setError('Error updating todo');
-      }
+      console.error('Error adding todo:', error);
+      throw error;
     }
   };
 
-  const updateTodo = async (id: string, todo: Partial<Todo>) => {
+  const updateTodo = async (id: string, data: Partial<Todo>) => {
+    if (!user) throw new Error('Must be logged in to update a todo');
+
     try {
       const todoRef = doc(db, 'todos', id);
-      await updateDoc(todoRef, convertTodoToFirestore(todo));
+      const firestoreTodo = convertTodoToFirestore({
+        ...data,
+        updatedAt: new Date(),
+      });
+      await updateDoc(todoRef, firestoreTodo);
     } catch (error) {
-      if (error instanceof Error) {
-        setError(error.message);
-      } else {
-        setError('Error updating todo');
-      }
+      console.error('Error updating todo:', error);
+      throw error;
     }
   };
 
   const deleteTodo = async (id: string) => {
+    if (!user) throw new Error('Must be logged in to delete a todo');
+    if (!id || typeof id !== 'string') {
+      throw new Error('Invalid todo ID');
+    }
+
     try {
-      await deleteDoc(doc(db, 'todos', id));
+      const todoRef = doc(db, 'todos', id.trim());
+      await deleteDoc(todoRef);
     } catch (error) {
-      if (error instanceof Error) {
-        setError(error.message);
-      } else {
-        setError('Error deleting todo');
-      }
+      console.error('Error deleting todo:', error);
+      throw error;
+    }
+  };
+
+  const toggleTodo = async (id: string, completed: boolean) => {
+    if (!user) throw new Error('Must be logged in to toggle a todo');
+
+    try {
+      const todoRef = doc(db, 'todos', id);
+      await updateDoc(todoRef, { 
+        completed,
+        updatedAt: Timestamp.now(),
+      });
+    } catch (error) {
+      console.error('Error toggling todo:', error);
+      throw error;
     }
   };
 
@@ -166,8 +211,8 @@ export function useTodos() {
     loading,
     error,
     addTodo,
-    toggleTodo,
     updateTodo,
     deleteTodo,
+    toggleTodo,
   };
 }

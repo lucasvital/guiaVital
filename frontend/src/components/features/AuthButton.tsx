@@ -1,20 +1,23 @@
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../ui/button';
-import { LogIn, LogOut } from 'lucide-react';
+import { LogIn, LogOut, Sun, Moon } from 'lucide-react';
 import { UserAvatar } from './UserAvatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '../ui/dropdown-menu';
 import { MouseEvent, useEffect } from 'react';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { auth } from '../../config/firebase';
+import { useTheme } from '../../contexts/ThemeContext';
 
 export function AuthButton() {
   console.log('AuthButton rendering...');
   const { user, signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   console.log('AuthButton hooks loaded, user:', user);
 
   useEffect(() => {
@@ -71,6 +74,20 @@ export function AuthButton() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={toggleTheme}>
+          {theme === 'light' ? (
+            <>
+              <Moon className="mr-2 h-4 w-4" />
+              <span>Modo Escuro</span>
+            </>
+          ) : (
+            <>
+              <Sun className="mr-2 h-4 w-4" />
+              <span>Modo Claro</span>
+            </>
+          )}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleSignOut}>
           <LogOut className="mr-2 h-4 w-4" />
           <span>Sair</span>

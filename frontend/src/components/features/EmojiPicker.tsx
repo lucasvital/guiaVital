@@ -5,8 +5,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '../ui/popover';
-
-const EMOJIS = ['📝', '📅', '🏠', '🛒', '💼', '🎮', '🎵', '📚', '✈️', '🎨', '🏃', '⚫'];
+import data from '@emoji-mart/data';
+import Picker from '@emoji-mart/react';
 
 interface EmojiPickerProps {
   value: string;
@@ -14,37 +14,23 @@ interface EmojiPickerProps {
 }
 
 export function EmojiPicker({ value, onChange }: EmojiPickerProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [open, setOpen] = useState(false);
 
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={isOpen}
-          className="w-full justify-between"
-        >
-          <span className="text-lg">{value}</span>
+        <Button variant="outline" className="w-[100px] h-[40px]">
+          {value || 'Escolher'}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[200px] p-0">
-        <div className="flex flex-wrap items-center p-1">
-          {EMOJIS.map((emoji) => (
-            <button
-              key={emoji}
-              className={`text-base p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 ${
-                value === emoji ? 'bg-slate-100 dark:bg-slate-800' : ''
-              }`}
-              onClick={() => {
-                onChange(emoji);
-                setIsOpen(false);
-              }}
-            >
-              {emoji}
-            </button>
-          ))}
-        </div>
+      <PopoverContent className="p-0" align="start">
+        <Picker
+          data={data}
+          onEmojiSelect={(emoji: any) => {
+            onChange(emoji.native);
+            setOpen(false);
+          }}
+        />
       </PopoverContent>
     </Popover>
   );

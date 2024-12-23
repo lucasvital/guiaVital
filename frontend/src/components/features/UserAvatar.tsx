@@ -10,6 +10,8 @@ export interface UserAvatarProps {
 }
 
 export function UserAvatar({ user, showUploadButton = false, onUpload }: UserAvatarProps) {
+  if (!user) return null;
+
   const initials = user.email
     ? user.email.substring(0, 2).toUpperCase()
     : '??';
@@ -26,7 +28,18 @@ export function UserAvatar({ user, showUploadButton = false, onUpload }: UserAva
           variant="outline"
           size="icon"
           className="absolute -bottom-2 -right-2 h-6 w-6 rounded-full"
-          onClick={onUpload}
+          onClick={() => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.onchange = (e) => {
+              const file = (e.target as HTMLInputElement).files?.[0];
+              if (file && onUpload) {
+                onUpload(file);
+              }
+            };
+            input.click();
+          }}
         >
           <Upload className="h-3 w-3" />
         </Button>

@@ -1,105 +1,136 @@
-import { List } from '../../types/list';
+import { MoreHorizontal, Pencil, Share2, Trash2 } from 'lucide-react';
+import { List, ListStats } from '../../types/list';
 import { Button } from '../ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { Settings2, Share2, Trash2 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
+import { cn } from '../../lib/utils';
 
-export interface ListCardProps {
+interface ListCardProps {
   list: List;
-  onSelect: () => void;
   onEdit: (list: List) => void;
   onDelete: (listId: string) => void;
   onShare: (listId: string) => void;
+  selected?: boolean;
+  onSelect?: () => void;
 }
 
-export function ListCard({
-  list,
-  onSelect,
-  onEdit,
-  onDelete,
-  onShare
-}: ListCardProps) {
-  const stats = {
-    completed: list.todos?.filter(todo => todo.completed).length || 0,
-    total: list.todos?.length || 0,
-    highPriority: list.todos?.filter(todo => todo.priority === 'high').length || 0,
-    dueSoon: list.todos?.filter(todo => {
+export function ListCard({ list, onEdit, onDelete, onShare, selected, onSelect }: ListCardProps) {
+  // Calcular estatísticas
+  const stats: ListStats = {
+    totalTasks: list.todos?.length || 0,
+    completedTasks: list.todos?.filter(todo => todo.completed).length || 0,
+    highPriorityTasks: list.todos?.filter(todo => todo.priority === 'HIGH').length || 0,
+    dueSoonTasks: list.todos?.filter(todo => {
       if (!todo.dueDate) return false;
-      const now = new Date();
-      const diffDays = Math.ceil((todo.dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      return diffDays <= 3 && diffDays > 0;
+      const dueDate = todo.dueDate instanceof Date ? todo.dueDate : new Date(todo.dueDate);
+      const daysUntilDue = Math.ceil((dueDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+      return daysUntilDue <= 3 && daysUntilDue >= 0;
     }).length || 0,
-    overdue: list.todos?.filter(todo => {
+    overdueTasks: list.todos?.filter(todo => {
       if (!todo.dueDate) return false;
-      const now = new Date();
-      return todo.dueDate < now;
-    }).length || 0
+      const dueDate = todo.dueDate instanceof Date ? todo.dueDate : new Date(todo.dueDate);
+      return dueDate < new Date();
+    }).length || 0,
   };
 
   return (
-    <Card
+    <div
+      className={cn(
+        "p-4 rounded-lg border bg-card text-card-foreground shadow-sm cursor-pointer",
+        "hover:shadow-md transition-shadow",
+        selected && "ring-2 ring-primary",
+      )}
+      style={{
+        borderLeftWidth: '4px',
+        borderLeftColor: list.color,
+      }}
       onClick={onSelect}
-      className="cursor-pointer hover:shadow-md transition-shadow"
     >
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-xl font-semibold">
-          <div className="flex items-center gap-2">
-            {list.icon && <span>{list.icon}</span>}
-            <span style={{ color: list.color }}>{list.name}</span>
-          </div>
-        </CardTitle>
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={(e) => {
-              e.stopPropagation();
-              onShare(list.id);
-            }}
-          >
-            <Share2 className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={(e) => {
+          {list.icon && <span className="text-xl">{list.icon}</span>}
+          <h3 className="font-semibold">{list.name}</h3>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={(e) => {
               e.stopPropagation();
               onEdit(list);
-            }}
-          >
-            <Settings2 className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={(e) => {
+            }}>
+              <Pencil className="h-4 w-4 mr-2" />
+              Editar
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={(e) => {
               e.stopPropagation();
-              onDelete(list.id);
+              onShare(list.id);
+            }}>
+              <Share2 className="h-4 w-4 mr-2" />
+              Compartilhar
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(list.id);
+              }}
+              className="text-red-600"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Excluir
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* Estatísticas */}
+      <div className="space-y-2 text-sm text-muted-foreground">
+        <div className="flex justify-between">
+          <span>Total de tarefas:</span>
+          <span>{stats.totalTasks}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Concluídas:</span>
+          <span>{stats.completedTasks}</span>
+        </div>
+        {stats.highPriorityTasks > 0 && (
+          <div className="flex justify-between text-red-500">
+            <span>Alta prioridade:</span>
+            <span>{stats.highPriorityTasks}</span>
+          </div>
+        )}
+        {stats.dueSoonTasks > 0 && (
+          <div className="flex justify-between text-yellow-500">
+            <span>Vencem em breve:</span>
+            <span>{stats.dueSoonTasks}</span>
+          </div>
+        )}
+        {stats.overdueTasks > 0 && (
+          <div className="flex justify-between text-red-500">
+            <span>Atrasadas:</span>
+            <span>{stats.overdueTasks}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Barra de progresso */}
+      <div className="mt-4">
+        <div className="h-2 bg-secondary rounded-full overflow-hidden">
+          <div
+            className="h-full bg-primary transition-all duration-300"
+            style={{
+              width: `${stats.totalTasks ? (stats.completedTasks / stats.totalTasks) * 100 : 0}%`,
             }}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          />
         </div>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <div className="text-2xl font-bold">{stats.completed}/{stats.total}</div>
-            <p className="text-xs text-muted-foreground">Tarefas Completadas</p>
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-red-500">{stats.highPriority}</div>
-            <p className="text-xs text-muted-foreground">Alta Prioridade</p>
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-yellow-500">{stats.dueSoon}</div>
-            <p className="text-xs text-muted-foreground">Vence em Breve</p>
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-red-500">{stats.overdue}</div>
-            <p className="text-xs text-muted-foreground">Atrasadas</p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

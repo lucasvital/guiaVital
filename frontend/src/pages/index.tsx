@@ -4,73 +4,63 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Header } from '../components/features/Header';
 import { FilterMenu } from '../components/features/FilterMenu';
-import { ListManager } from '../components/features/ListManager';
-import { CategoryManager } from '../components/features/CategoryManager';
-import { AddTodo } from '../components/features/AddTodo';
 import { Todo } from '../types/todo';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, FileText } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { TodoCard } from '../components/features/TodoCard';
-import { priorityOrder } from '../lib/constants';
 import { useTodos } from '../hooks/useTodos';
+import { Priority } from '../types/todo';
+import { AddTodo } from '../components/features/AddTodo';
+import { Templates } from '../components/features/Templates';
+
+interface Filters {
+  priority: Priority;
+  categoryId: string | null;
+  dateRange: {
+    from: Date | null;
+    to: Date | null;
+  };
+}
 
 export default function TodoList() {
   const { user, loading: authLoading } = useAuth();
-  const { todos, toggleTodo, deleteTodo, updateTodo } = useTodos();
+  const { todos, loading, error, toggleTodo, deleteTodo, updateTodo } = useTodos();
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<'ALL' | 'ACTIVE' | 'COMPLETED'>('ALL');
   const [sortBy, setSortBy] = useState<'priority' | 'dueDate' | 'createdAt'>('createdAt');
   const [isAddTodoOpen, setIsAddTodoOpen] = useState(false);
-  const [isListManagerOpen, setIsListManagerOpen] = useState(false);
-  const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
-  const [selectedListId, setSelectedListId] = useState<string | null>(null);
+  const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
 
-  const handleSelectList = (listId: string | null) => {
-    setSelectedListId(listId);
-    setIsListManagerOpen(false);
-  };
+  console.log('Current todos:', todos);
 
-  const sortTodos = (todos: Todo[]) => {
-    return [...todos].sort((a, b) => {
-      switch (sortBy) {
-        case 'priority':
-          return priorityOrder[b.priority] - priorityOrder[a.priority];
-        case 'dueDate':
-          if (!a.dueDate && !b.dueDate) return 0;
-          if (!a.dueDate) return 1;
-          if (!b.dueDate) return -1;
-          return b.dueDate.valueOf() - a.dueDate.valueOf();
-        case 'createdAt':
-          return b.createdAt.valueOf() - a.createdAt.valueOf();
-        default:
-          return 0;
-      }
-    });
-  };
-
-  const filteredTodos = sortTodos(todos.filter((todo) => {
-    switch (filter) {
-      case 'ACTIVE':
-        return !todo.completed;
-      case 'COMPLETED':
-        return todo.completed;
-      default:
-        return true;
+  const filteredTodos = todos.filter(todo => {
+    if (searchQuery && !todo.title.toLowerCase().includes(searchQuery.toLowerCase())) {
+      return false;
     }
-  })).filter(todo => {
-    const matchesSearch = 
-      todo.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      todo.tags?.some(tag => tag.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    return matchesSearch;
+    if (filter === 'ACTIVE' && todo.completed) {
+      return false;
+    }
+    if (filter === 'COMPLETED' && !todo.completed) {
+      return false;
+    }
+
+    return true;
+  });
+
+  const sortedTodos = [...filteredTodos].sort((a, b) => {
+    if (sortBy === 'priority') {
+      const priorityOrder = { high: 3, medium: 2, low: 1 };
+      return priorityOrder[b.priority.toLowerCase() as keyof typeof priorityOrder] - priorityOrder[a.priority.toLowerCase() as keyof typeof priorityOrder];
+    }
+    if (sortBy === 'dueDate') {
+      if (!a.dueDate) return 1;
+      if (!b.dueDate) return -1;
+      return a.dueDate.getTime() - b.dueDate.getTime();
+    }
+    return b.createdAt.getTime() - a.createdAt.getTime();
   });
 
   if (authLoading) {
@@ -104,39 +94,34 @@ export default function TodoList() {
                 placeholder="Search tasks..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 w-[300px]"
+                className="pl-10"
               />
             </div>
-            <FilterMenu onFilterChange={() => {}} />
+            <FilterMenu
+              filter={filter}
+              onFilterChange={(filters: Filters) => {
+                setFilter(filters.priority === 'LOW' ? 'ALL' : 'ACTIVE');
+              }}
+              sortBy={sortBy}
+              onSortChange={setSortBy}
+            />
           </div>
-          <div className="flex items-center gap-4">
-            <Dialog open={isListManagerOpen} onOpenChange={setIsListManagerOpen}>
+
+          <div className="flex gap-2">
+            <Dialog open={isTemplatesOpen} onOpenChange={setIsTemplatesOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline">Manage Lists</Button>
+                <Button variant="outline" className="gap-2">
+                  <FileText className="h-4 w-4" />
+                  Templates
+                </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[600px]">
+              <DialogContent className="max-w-4xl">
                 <DialogHeader>
-                  <DialogTitle>Manage Lists</DialogTitle>
+                  <DialogTitle>Templates</DialogTitle>
                 </DialogHeader>
-                <ListManager 
-                  onSelectList={handleSelectList}
-                  selectedListId={selectedListId}
-                />
+                <Templates onClose={() => setIsTemplatesOpen(false)} />
               </DialogContent>
             </Dialog>
-
-            <Dialog open={isCategoryManagerOpen} onOpenChange={setIsCategoryManagerOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline">Manage Categories</Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[600px]">
-                <DialogHeader>
-                  <DialogTitle>Manage Categories</DialogTitle>
-                </DialogHeader>
-                <CategoryManager />
-              </DialogContent>
-            </Dialog>
-
             <Dialog open={isAddTodoOpen} onOpenChange={setIsAddTodoOpen}>
               <DialogTrigger asChild>
                 <Button>
@@ -146,25 +131,37 @@ export default function TodoList() {
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Add New Task</DialogTitle>
+                  <DialogTitle>Add Task</DialogTitle>
                 </DialogHeader>
-                <AddTodo />
+                <AddTodo onClose={() => setIsAddTodoOpen(false)} />
               </DialogContent>
             </Dialog>
           </div>
         </div>
-        
-        <div className="space-y-4">
-          {filteredTodos.map((todo) => (
-            <TodoCard
-              key={todo.id}
-              todo={todo}
-              onToggleComplete={() => toggleTodo(todo.id, !todo.completed)}
-              onDelete={() => deleteTodo(todo.id)}
-              onUpdate={(data) => updateTodo(todo.id, data)}
-            />
-          ))}
-        </div>
+
+        {loading ? (
+          <div>Loading...</div>
+        ) : error ? (
+          <div>Error: {error}</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {sortedTodos.length > 0 ? (
+              sortedTodos.map((todo) => (
+                <TodoCard
+                  key={todo.id}
+                  todo={todo}
+                  onToggleComplete={() => toggleTodo(todo.id, !todo.completed)}
+                  onDelete={() => deleteTodo(todo.id)}
+                  onUpdate={(data) => updateTodo(todo.id, data)}
+                />
+              ))
+            ) : (
+              <div className="col-span-3 text-center py-8 text-muted-foreground">
+                No tasks found
+              </div>
+            )}
+          </div>
+        )}
       </main>
     </div>
   );

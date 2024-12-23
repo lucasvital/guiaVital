@@ -14,17 +14,22 @@ export interface List {
   name: string;
   color: string;
   icon?: string;
-  createdBy: string;
-  members: ListMember[];
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-  todos: Todo[];
+  owner: string;
+  sharedWith: {
+    email: string;
+    permission: 'read' | 'write' | 'admin';
+    addedAt: Date;
+    addedBy: string;
+  }[];
+  createdAt: Date;
+  updatedAt: Date;
+  todos?: Todo[];
 }
 
 export interface ListStats {
-  completed: number;
-  total: number;
-  highPriority: number;
-  dueSoon: number;
-  overdue: number;
+  totalTasks: number;
+  completedTasks: number;
+  highPriorityTasks: number;
+  dueSoonTasks: number;
+  overdueTasks: number;
 }

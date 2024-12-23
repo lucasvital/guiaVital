@@ -28,6 +28,8 @@ interface CategorySelectProps {
   onSelect: (categoryId: string | null) => void;
 }
 
+const NO_CATEGORY = 'no_category';
+
 export function CategorySelect({ selectedCategory, onSelect }: CategorySelectProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const { user } = useAuth();
@@ -59,14 +61,16 @@ export function CategorySelect({ selectedCategory, onSelect }: CategorySelectPro
 
   return (
     <Select
-      value={selectedCategory || ''}
-      onValueChange={(value) => onSelect(value || null)}
+      value={selectedCategory || NO_CATEGORY}
+      onValueChange={(value) => onSelect(value === NO_CATEGORY ? null : value)}
     >
-      <SelectTrigger>
+      <SelectTrigger className="w-full">
         <SelectValue placeholder="Selecionar categoria..." />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="">Sem categoria</SelectItem>
+        <SelectItem value={NO_CATEGORY} className="text-muted-foreground">
+          Sem categoria
+        </SelectItem>
         {categories.map((category) => (
           <SelectItem
             key={category.id}

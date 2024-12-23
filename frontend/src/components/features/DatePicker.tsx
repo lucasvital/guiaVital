@@ -12,8 +12,8 @@ import {
 } from '../ui/popover';
 
 export interface DatePickerProps {
-  value: Date | null;
-  onChange: (date: Date | null) => void;
+  value?: Date | null;
+  onChange?: (date: Date | null) => void;
   placeholder?: string;
   label?: string;
 }
@@ -39,15 +39,20 @@ export function DatePicker({
             )}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
-            {value ? format(value, "PPP", { locale: ptBR }) : placeholder}
+            {value ? (
+              format(value, "PPP", { locale: ptBR })
+            ) : (
+              <span>{placeholder}</span>
+            )}
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
           <Calendar
             mode="single"
             selected={value || undefined}
-            onSelect={(date) => onChange(date || null)}
+            onSelect={(date) => onChange?.(date || null)}
             initialFocus
+            locale={ptBR}
           />
         </PopoverContent>
       </Popover>

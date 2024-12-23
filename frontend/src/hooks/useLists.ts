@@ -1,51 +1,31 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc, Timestamp, DocumentData } from 'firebase/firestore';
-import { db } from '../config/firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { List, ListMember } from '../types/list';
+import { db } from '../config/firebase';
+import { List } from '../types/list';
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  addDoc,
+  updateDoc,
+  doc,
+  deleteDoc,
+  arrayUnion,
+  Timestamp,
+} from 'firebase/firestore';
 
-interface FirestoreList {
-  name: string;
-  color: string;
-  icon?: string;
-  createdBy: string;
-  members: ListMember[];
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-  todos: string[]; // Array of todo IDs
+interface UseListsReturn {
+  lists: List[];
+  loading: boolean;
+  error: string | null;
+  createList: (name: string, color: string, icon: string) => Promise<void>;
+  updateList: (listId: string, data: Partial<List>) => Promise<void>;
+  deleteList: (listId: string) => Promise<void>;
+  shareList: (listId: string, email: string, permission?: 'read' | 'write' | 'admin') => Promise<void>;
 }
 
-const convertFirestoreToList = (doc: DocumentData): List => {
-  const data = doc.data() as FirestoreList;
-  return {
-    id: doc.id,
-    name: data.name,
-    color: data.color,
-    icon: data.icon,
-    createdBy: data.createdBy,
-    members: data.members || [],
-    createdAt: data.createdAt,
-    updatedAt: data.updatedAt,
-    todos: [], // Fetch todos separately if needed
-  };
-};
-
-const convertListToFirestore = (list: Partial<List>): Partial<FirestoreList> => {
-  const { id, todos, ...rest } = list;
-  
-  // Convert todos array to array of IDs if present
-  const todoIds = todos?.map(todo => todo.id);
-  
-  const firestoreList: Partial<FirestoreList> = {
-    ...rest,
-    todos: todoIds,
-    updatedAt: Timestamp.now(),
-  };
-  
-  return firestoreList;
-};
-
-export function useLists() {
+export function useLists(): UseListsReturn {
   const [lists, setLists] = useState<List[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -58,20 +38,38 @@ export function useLists() {
       return;
     }
 
+    setLoading(true);
+    setError(null);
+
     const q = query(
       collection(db, 'lists'),
-      where('members', 'array-contains', { userId: user.uid })
+      where('owner', '==', user.email)
     );
 
-    const unsubscribe = onSnapshot(
-      q,
-      (querySnapshot) => {
-        const listsData = querySnapshot.docs.map(convertFirestoreToList);
+    const unsubscribe = onSnapshot(q, 
+      (snapshot) => {
+        const listsData = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            name: data.name,
+            color: data.color,
+            icon: data.icon,
+            owner: data.owner,
+            sharedWith: data.sharedWith?.map((share: any) => ({
+              ...share,
+              addedAt: share.addedAt?.toDate(),
+            })) || [],
+            createdAt: data.createdAt?.toDate(),
+            todos: data.todos || [],
+          } as List;
+        });
         setLists(listsData);
         setLoading(false);
       },
       (error) => {
-        setError(error.message);
+        console.error('Error fetching lists:', error);
+        setError('Failed to load lists. Please try again later.');
         setLoading(false);
       }
     );
@@ -79,61 +77,66 @@ export function useLists() {
     return () => unsubscribe();
   }, [user]);
 
-  const addList = async (name: string, color: string, icon?: string) => {
+  const createList = async (name: string, color: string, icon: string) => {
+    if (!user) throw new Error('Must be logged in to create a list');
+
     try {
-      if (!user) throw new Error('User not authenticated');
-
-      const member: ListMember = {
-        userId: user.uid,
-        email: user.email!,
-        permission: 'admin'
-      };
-
-      const listData: FirestoreList = {
+      await addDoc(collection(db, 'lists'), {
         name,
         color,
         icon,
-        createdBy: user.uid,
-        members: [member],
+        owner: user.email,
+        sharedWith: [],
         createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
         todos: [],
-      };
-
-      await addDoc(collection(db, 'lists'), listData);
+      });
     } catch (error) {
-      if (error instanceof Error) {
-        setError(error.message);
-      } else {
-        setError('Error creating list');
-      }
+      console.error('Error creating list:', error);
       throw error;
     }
   };
 
-  const updateList = async (id: string, list: Partial<List>) => {
+  const updateList = async (listId: string, data: Partial<List>) => {
+    if (!user) throw new Error('Must be logged in to update a list');
+
     try {
-      const listRef = doc(db, 'lists', id);
-      await updateDoc(listRef, convertListToFirestore(list));
+      const listRef = doc(db, 'lists', listId);
+      await updateDoc(listRef, {
+        ...data,
+        updatedAt: Timestamp.now(),
+      });
     } catch (error) {
-      if (error instanceof Error) {
-        setError(error.message);
-      } else {
-        setError('Error updating list');
-      }
+      console.error('Error updating list:', error);
       throw error;
     }
   };
 
-  const deleteList = async (id: string) => {
+  const deleteList = async (listId: string) => {
+    if (!user) throw new Error('Must be logged in to delete a list');
+
     try {
-      await deleteDoc(doc(db, 'lists', id));
+      await deleteDoc(doc(db, 'lists', listId));
     } catch (error) {
-      if (error instanceof Error) {
-        setError(error.message);
-      } else {
-        setError('Error deleting list');
-      }
+      console.error('Error deleting list:', error);
+      throw error;
+    }
+  };
+
+  const shareList = async (listId: string, email: string, permission: 'read' | 'write' | 'admin' = 'read') => {
+    if (!user) throw new Error('Must be logged in to share a list');
+
+    try {
+      const listRef = doc(db, 'lists', listId);
+      await updateDoc(listRef, {
+        sharedWith: arrayUnion({
+          email,
+          permission,
+          addedAt: Timestamp.now(),
+          addedBy: user.email,
+        }),
+      });
+    } catch (error) {
+      console.error('Error sharing list:', error);
       throw error;
     }
   };
@@ -142,8 +145,9 @@ export function useLists() {
     lists,
     loading,
     error,
-    addList,
+    createList,
     updateList,
     deleteList,
+    shareList,
   };
 }

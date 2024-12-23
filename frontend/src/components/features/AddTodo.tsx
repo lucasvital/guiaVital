@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Textarea } from '../ui/textarea';
+import { Label } from '../ui/label';
 import { TagManager } from './TagManager';
 import { SubTaskManager } from './SubTaskManager';
 import { PrioritySelect } from './PrioritySelect';
@@ -10,27 +10,29 @@ import { useAuth } from '../../contexts/AuthContext';
 import { db } from '../../config/firebase';
 import { addDoc, collection, Timestamp } from 'firebase/firestore';
 import { Todo, Tag, SubTask, Priority } from '../../types/todo';
+import { Card, CardContent } from '../ui/card';
 
-interface FirestoreTodo {
-  title: string;
-  description?: string;
-  completed: boolean;
-  priority: Priority;
-  dueDate?: Timestamp;
-  reminder?: Timestamp;
+interface AddTodoProps {
+  onClose?: () => void;
   listId?: string;
-  categoryId?: string;
-  tags: Tag[];
-  subtasks: SubTask[];
-  userId: string;
-  createdAt: Timestamp;
-  updatedAt?: Timestamp;
 }
 
-export function AddTodo() {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [priority, setPriority] = useState<Priority>('medium');
+interface FirestoreTodo {
+  completed: boolean;
+  createdAt: Timestamp;
+  dueDate: Timestamp | null;
+  list: string | null;
+  ownerId: string;
+  priority: Priority;
+  reminder: Timestamp | null;
+  subTasks: SubTask[];
+  tags: Tag[];
+  text: string;
+}
+
+export function AddTodo({ onClose, listId }: AddTodoProps) {
+  const [text, setText] = useState('');
+  const [priority, setPriority] = useState<Priority>('MEDIUM');
   const [dueDate, setDueDate] = useState<Date | null>(null);
   const [reminder, setReminder] = useState<Date | null>(null);
   const [tags, setTags] = useState<Tag[]>([]);
@@ -39,94 +41,113 @@ export function AddTodo() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !title.trim()) return;
+    if (!user || !text.trim()) return;
 
     try {
-      const firestoreTodo: Omit<FirestoreTodo, 'id'> = {
-        title: title.trim(),
-        description: description.trim() || undefined,
+      const firestoreTodo: FirestoreTodo = {
+        text: text.trim(),
         completed: false,
         priority,
         tags,
-        subtasks,
-        userId: user.uid,
+        subTasks: subtasks,
+        ownerId: user.uid,
         createdAt: Timestamp.now(),
+        dueDate: dueDate ? Timestamp.fromDate(dueDate) : null,
+        reminder: reminder ? Timestamp.fromDate(reminder) : null,
+        list: listId || null,
       };
-
-      if (dueDate) {
-        firestoreTodo.dueDate = Timestamp.fromDate(dueDate);
-      }
-
-      if (reminder) {
-        firestoreTodo.reminder = Timestamp.fromDate(reminder);
-      }
 
       await addDoc(collection(db, 'todos'), firestoreTodo);
 
-      // Limpar o formulário
-      setTitle('');
-      setDescription('');
-      setPriority('medium');
+      // Limpar o formulário e fechar
+      setText('');
+      setPriority('MEDIUM');
       setDueDate(null);
       setReminder(null);
       setTags([]);
       setSubtasks([]);
+      if (onClose) onClose();
     } catch (error) {
       console.error('Error adding todo:', error);
+      alert('Erro ao criar tarefa. Por favor, tente novamente.');
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <Input
-        placeholder="Título da tarefa"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        required
-      />
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="title">Título</Label>
+          <Input
+            id="title"
+            placeholder="Digite o título da tarefa..."
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            required
+          />
+        </div>
 
-      <Textarea
-        placeholder="Descrição (opcional)"
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-      />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label>Prioridade</Label>
+            <PrioritySelect
+              value={priority}
+              onChange={setPriority}
+            />
+          </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <PrioritySelect
-          value={priority}
-          onChange={setPriority}
-        />
+          <div className="space-y-2">
+            <Label>Data de vencimento</Label>
+            <DatePicker
+              value={dueDate}
+              onChange={setDueDate}
+            />
+          </div>
+        </div>
 
-        <DatePicker
-          label="Data de vencimento"
-          value={dueDate}
-          onChange={setDueDate}
-        />
+        <div className="space-y-2">
+          <Label>Lembrete</Label>
+          <DatePicker
+            value={reminder}
+            onChange={setReminder}
+          />
+        </div>
 
-        <DatePicker
-          label="Lembrete"
-          value={reminder}
-          onChange={setReminder}
-        />
+        <Card>
+          <CardContent className="pt-6">
+            <div className="space-y-2">
+              <Label>Tags</Label>
+              <TagManager
+                tags={tags}
+                onChange={setTags}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="space-y-2">
+              <Label>Subtarefas</Label>
+              <SubTaskManager
+                subtasks={subtasks}
+                onChange={setSubtasks}
+              />
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      <TagManager
-        selectedTags={tags}
-        onTagsChange={setTags}
-      />
-
-      <SubTaskManager
-        selectedSubTasks={subtasks}
-        onSubTasksChange={setSubtasks}
-      />
-
-      <Button
-        type="submit"
-        disabled={!title.trim()}
-        className="w-full"
-      >
-        Adicionar Tarefa
-      </Button>
+      <div className="flex justify-end gap-2 pt-4 border-t">
+        {onClose && (
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancelar
+          </Button>
+        )}
+        <Button type="submit" className="min-w-[100px]">
+          Criar Tarefa
+        </Button>
+      </div>
     </form>
   );
 }

@@ -13,9 +13,9 @@ interface PrioritySelectProps {
 }
 
 const priorityOptions: { value: Priority; label: string }[] = [
-  { value: 'low', label: 'Baixa' },
-  { value: 'medium', label: 'Média' },
   { value: 'high', label: 'Alta' },
+  { value: 'medium', label: 'Média' },
+  { value: 'low', label: 'Baixa' },
 ];
 
 export function PrioritySelect({
@@ -27,8 +27,8 @@ export function PrioritySelect({
       value={value}
       onValueChange={onChange}
     >
-      <SelectTrigger>
-        <SelectValue placeholder="Selecione a prioridade" />
+      <SelectTrigger className="w-full">
+        <SelectValue />
       </SelectTrigger>
       <SelectContent>
         {priorityOptions.map((option) => (
@@ -53,7 +53,7 @@ function getPriorityColor(priority: Priority): string {
     case 'medium':
       return 'bg-yellow-500';
     case 'low':
-      return 'bg-green-500';
+      return 'bg-blue-500';
     default:
       return 'bg-gray-500';
   }

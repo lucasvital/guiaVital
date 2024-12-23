@@ -18,7 +18,7 @@ interface FilterMenuProps {
 }
 
 interface Filters {
-  priority: Priority | null;
+  priority: Priority;
   categoryId: string | null;
   dateRange: {
     from: Date | null;
@@ -27,7 +27,7 @@ interface Filters {
 }
 
 const initialFilters: Filters = {
-  priority: null,
+  priority: 'medium',
   categoryId: null,
   dateRange: {
     from: null,
@@ -59,7 +59,7 @@ export function FilterMenu({ onFilterChange }: FilterMenuProps) {
   };
 
   const activeFiltersCount = [
-    filters.priority,
+    filters.priority !== 'medium' ? filters.priority : null,
     filters.categoryId,
     filters.dateRange.from,
     filters.dateRange.to
@@ -82,7 +82,7 @@ export function FilterMenu({ onFilterChange }: FilterMenuProps) {
           <div className="space-y-2">
             <label className="text-sm font-medium">Prioridade</label>
             <PrioritySelect
-              value={filters.priority || 'medium'}
+              value={filters.priority}
               onChange={(priority) => handleFilterChange({ priority })}
             />
           </div>
@@ -99,15 +99,9 @@ export function FilterMenu({ onFilterChange }: FilterMenuProps) {
             <label className="text-sm font-medium">Data Inicial</label>
             <DatePicker
               value={filters.dateRange.from}
-              onChange={(date) =>
-                handleFilterChange({
-                  dateRange: {
-                    ...filters.dateRange,
-                    from: date
-                  }
-                })
-              }
-              placeholder="Data inicial..."
+              onChange={(date) => handleFilterChange({
+                dateRange: { ...filters.dateRange, from: date }
+              })}
             />
           </div>
 
@@ -115,27 +109,23 @@ export function FilterMenu({ onFilterChange }: FilterMenuProps) {
             <label className="text-sm font-medium">Data Final</label>
             <DatePicker
               value={filters.dateRange.to}
-              onChange={(date) =>
-                handleFilterChange({
-                  dateRange: {
-                    ...filters.dateRange,
-                    to: date
-                  }
-                })
-              }
-              placeholder="Data final..."
+              onChange={(date) => handleFilterChange({
+                dateRange: { ...filters.dateRange, to: date }
+              })}
             />
           </div>
+
+          <DropdownMenuSeparator />
+
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={handleClearFilters}>
+              Limpar Filtros
+            </Button>
+            <Button onClick={() => setOpen(false)}>
+              Aplicar
+            </Button>
+          </div>
         </div>
-
-        <DropdownMenuSeparator />
-
-        <DropdownMenuItem
-          className="text-center cursor-pointer"
-          onClick={handleClearFilters}
-        >
-          Limpar filtros
-        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

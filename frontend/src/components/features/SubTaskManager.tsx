@@ -6,11 +6,11 @@ import { X } from 'lucide-react';
 import { SubTask } from '../../types/todo';
 
 interface SubTaskManagerProps {
-  selectedSubTasks: SubTask[];
-  onSubTasksChange: (subtasks: SubTask[]) => void;
+  subtasks: SubTask[];
+  onChange: (subtasks: SubTask[]) => void;
 }
 
-export function SubTaskManager({ selectedSubTasks, onSubTasksChange }: SubTaskManagerProps) {
+export function SubTaskManager({ subtasks, onChange }: SubTaskManagerProps) {
   const [newSubTask, setNewSubTask] = useState('');
 
   const handleAddSubTask = () => {
@@ -22,17 +22,17 @@ export function SubTaskManager({ selectedSubTasks, onSubTasksChange }: SubTaskMa
       completed: false
     };
     
-    onSubTasksChange([...selectedSubTasks, newTask]);
+    onChange([...subtasks, newTask]);
     setNewSubTask('');
   };
 
   const handleRemoveSubTask = (taskId: string) => {
-    onSubTasksChange(selectedSubTasks.filter(task => task.id !== taskId));
+    onChange(subtasks.filter(task => task.id !== taskId));
   };
 
   const handleToggleComplete = (taskId: string) => {
-    onSubTasksChange(
-      selectedSubTasks.map(task =>
+    onChange(
+      subtasks.map(task =>
         task.id === taskId ? { ...task, completed: !task.completed } : task
       )
     );
@@ -54,7 +54,7 @@ export function SubTaskManager({ selectedSubTasks, onSubTasksChange }: SubTaskMa
         </Button>
       </div>
       <div className="space-y-2">
-        {selectedSubTasks.map((task) => (
+        {subtasks.map((task) => (
           <div key={task.id} className="flex items-center gap-2">
             <Checkbox
               checked={task.completed}
