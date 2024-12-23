@@ -10,80 +10,72 @@ import {
 } from '../ui/dropdown-menu';
 import { MouseEvent, useEffect } from 'react';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { auth } from '../../config/firebase';
 
 export function AuthButton() {
   console.log('AuthButton rendering...');
-  
-  try {
-    const { user, auth, signOut } = useAuth();
-    console.log('AuthButton hooks loaded, user:', user);
+  const { user, signOut } = useAuth();
+  console.log('AuthButton hooks loaded, user:', user);
 
-    useEffect(() => {
-      console.log('AuthButton mounted, user state:', user);
-    }, [user]);
+  useEffect(() => {
+    console.log('AuthButton mounted, user state:', user);
+  }, [user]);
 
-    const handleSignOut = async (e: MouseEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      try {
-        await signOut();
-        console.log('Sign-out successful!');
-      } catch (error) {
-        console.error('Error signing out:', error);
-        if (error instanceof Error) {
-          alert(`Error signing out: ${error.message}`);
-        } else {
-          alert('An unknown error occurred while signing out');
-        }
+  const handleSignIn = () => {
+    console.log('Button clicked directly!');
+    const provider = new GoogleAuthProvider();
+    signInWithPopup(auth, provider)
+      .then((result) => {
+        console.log('Sign in successful:', result);
+      })
+      .catch((error) => {
+        console.error('Sign in error:', error);
+        alert(error.message);
+      });
+  };
+
+  const handleSignOut = async (e: MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    try {
+      await signOut();
+      console.log('Sign-out successful!');
+    } catch (error) {
+      console.error('Error signing out:', error);
+      if (error instanceof Error) {
+        alert(`Error signing out: ${error.message}`);
+      } else {
+        alert('An unknown error occurred while signing out');
       }
-    };
-
-    console.log('Rendering AuthButton with user:', user);
-
-    if (!user) {
-      return (
-        <Button 
-          variant="outline" 
-          onClick={() => {
-            console.log('Button clicked directly!');
-            const provider = new GoogleAuthProvider();
-            signInWithPopup(auth, provider)
-              .then((result) => {
-                console.log('Sign in successful:', result);
-              })
-              .catch((error) => {
-                console.error('Sign in error:', error);
-                alert(error.message);
-              });
-          }}
-        >
-          <LogIn className="mr-2 h-4 w-4" />
-          Entrar com Google
-        </Button>
-      );
     }
+  };
 
+  console.log('Rendering AuthButton with user:', user);
+
+  if (!user) {
     return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-            <UserAvatar user={user} showUploadButton={false} />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={handleSignOut}>
-            <LogOut className="mr-2 h-4 w-4" />
-            <span>Sair</span>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    );
-  } catch (error) {
-    console.error('Error in AuthButton:', error);
-    return (
-      <Button variant="outline" disabled>
+      <Button 
+        variant="outline" 
+        onClick={handleSignIn}
+      >
         <LogIn className="mr-2 h-4 w-4" />
-        Error Loading Auth
+        Entrar com Google
       </Button>
     );
   }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+          <UserAvatar user={user} showUploadButton={false} />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={handleSignOut}>
+          <LogOut className="mr-2 h-4 w-4" />
+          <span>Sair</span>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
