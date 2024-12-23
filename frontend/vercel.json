@@ -1,25 +1,35 @@
 {
-  "builds": [
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "framework": "vite",
+  "outputDirectory": "dist",
+  "rewrites": [
     {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": { "distDir": "dist" }
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ],
-  "routes": [
+  "headers": [
     {
-      "src": "/manifest.json",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET",
-        "Access-Control-Allow-Headers": "X-Requested-With, Content-Type, Accept",
-        "Cache-Control": "public, max-age=0, must-revalidate"
-      },
-      "dest": "/manifest.json"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/manifest.json",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "X-Requested-With, Content-Type, Accept"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
     }
   ]
 }
