@@ -72,7 +72,6 @@ export function Header() {
         <div className="flex flex-1 items-center justify-end space-x-2">
           <nav className="flex items-center space-x-2">
             {user && <NotificationBell />}
-            {user && <UserAvatar user={user} />}
             <AuthButton />
           </nav>
         </div>
