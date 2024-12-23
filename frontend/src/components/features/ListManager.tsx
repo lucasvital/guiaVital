@@ -1,95 +1,64 @@
-import { Plus } from 'lucide-react';
 import { useState } from 'react';
-import { List } from '../../types/list';
 import { Button } from '../ui/button';
+import { Input } from '../ui/input';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '../ui/dialog';
-import { Input } from '../ui/input';
+import { List } from '../../types/list';
 import { ListCard } from './ListCard';
 import { useLists } from '../../hooks/useLists';
-import { Todo } from '../../types/todo';
 import { EmojiPicker } from './EmojiPicker';
 
 interface ListManagerProps {
-  onSelectList: (listId: string | null) => void;
-  selectedListId: string | null;
-  onClose?: () => void;
+  selectedListId?: string | null;
+  onSelectList?: (listId: string) => void;
 }
 
-export function ListManager({ onSelectList, selectedListId, onClose }: ListManagerProps) {
+export function ListManager({ selectedListId, onSelectList }: ListManagerProps) {
   const { lists, loading, error, createList, updateList, deleteList, shareList } = useLists();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingList, setEditingList] = useState<List | null>(null);
+  const [showNewList, setShowNewList] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [newListName, setNewListName] = useState('');
-  const [newListColor, setNewListColor] = useState('#2563eb'); // Azul por padrão
+  const [newListColor, setNewListColor] = useState('#2563eb');
   const [newListIcon, setNewListIcon] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!newListName.trim()) return;
+    if (!newListName) return;
 
     try {
-      if (editingList) {
-        await updateList(editingList.id, {
-          name: newListName,
-          color: newListColor,
-          icon: newListIcon,
-        });
-      } else {
-        await createList(newListName, newListColor, newListIcon);
-      }
-
+      await createList(newListName, newListColor, newListIcon);
       setNewListName('');
       setNewListColor('#2563eb');
       setNewListIcon('');
-      setEditingList(null);
-      setIsDialogOpen(false);
+      setShowNewList(false);
     } catch (error) {
-      console.error('Error saving list:', error);
-      alert('Erro ao salvar a lista. Por favor, tente novamente.');
+      console.error('Error creating list:', error);
     }
-  };
-
-  const handleEdit = (list: List) => {
-    setEditingList(list);
-    setNewListName(list.name);
-    setNewListColor(list.color);
-    setNewListIcon(list.icon || '');
-    setIsDialogOpen(true);
   };
 
   const handleDelete = async (listId: string) => {
-    if (window.confirm('Tem certeza que deseja excluir esta lista?')) {
-      try {
-        await deleteList(listId);
-        if (selectedListId === listId) {
-          onSelectList(null);
-        }
-      } catch (error) {
-        console.error('Error deleting list:', error);
-        alert('Erro ao excluir a lista. Por favor, tente novamente.');
-      }
+    try {
+      await deleteList(listId);
+    } catch (error) {
+      console.error('Error deleting list:', error);
     }
   };
 
-  const handleShare = async (listId: string) => {
-    const email = window.prompt('Digite o email do usuário para compartilhar:');
-    if (email) {
-      try {
-        await shareList(listId, email);
-        alert('Lista compartilhada com sucesso!');
-      } catch (error) {
-        console.error('Error sharing list:', error);
-        alert('Erro ao compartilhar a lista. Por favor, tente novamente.');
-      }
+  const handleShare = async (listId: string, email: string, permission: 'read' | 'write' | 'admin') => {
+    try {
+      await shareList(listId, email, permission);
+    } catch (error) {
+      console.error('Error sharing list:', error);
     }
   };
+
+  const filteredLists = lists.filter((list) =>
+    list.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   if (loading) {
     return (
@@ -101,35 +70,40 @@ export function ListManager({ onSelectList, selectedListId, onClose }: ListManag
 
   if (error) {
     return (
-      <div className="p-4 text-red-500 bg-red-50 rounded-lg">
-        <p>{error}</p>
-        <Button 
-          variant="link" 
-          className="text-red-500 p-0 h-auto text-sm"
-          onClick={() => window.location.reload()}
-        >
-          Tentar novamente
-        </Button>
+      <div className="text-center p-8 text-red-500">
+        Erro ao carregar listas: {error}
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-lg font-semibold">Minhas Listas</h2>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm">
-              <Plus className="h-4 w-4 mr-2" />
-              Nova Lista
-            </Button>
-          </DialogTrigger>
+    <div className="grid gap-4">
+      <div className="flex items-center justify-between">
+        <Input
+          placeholder="Buscar listas..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="max-w-sm"
+        />
+        <Button onClick={() => setShowNewList(true)}>Nova Lista</Button>
+      </div>
+
+      <div className="grid gap-4">
+        {filteredLists.map((list) => (
+          <ListCard
+            key={list.id}
+            list={list}
+            onSelect={onSelectList || (() => {})}
+            onDelete={handleDelete}
+          />
+        ))}
+      </div>
+
+      {showNewList && (
+        <Dialog open={true} onOpenChange={() => setShowNewList(false)}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>
-                {editingList ? 'Editar Lista' : 'Nova Lista'}
-              </DialogTitle>
+              <DialogTitle>Nova Lista</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
@@ -141,7 +115,6 @@ export function ListManager({ onSelectList, selectedListId, onClose }: ListManag
                   value={newListName}
                   onChange={(e) => setNewListName(e.target.value)}
                   placeholder="Nome da lista"
-                  required
                 />
               </div>
               <div>
@@ -153,38 +126,21 @@ export function ListManager({ onSelectList, selectedListId, onClose }: ListManag
                   type="color"
                   value={newListColor}
                   onChange={(e) => setNewListColor(e.target.value)}
-                  className="h-10 p-1"
                 />
               </div>
               <div>
-                <label htmlFor="icon" className="block text-sm font-medium mb-1">
-                  Ícone
+                <label className="block text-sm font-medium mb-1">
+                  Ícone (opcional)
                 </label>
                 <EmojiPicker value={newListIcon} onChange={setNewListIcon} />
               </div>
               <div className="flex justify-end">
-                <Button type="submit">
-                  {editingList ? 'Salvar' : 'Criar'}
-                </Button>
+                <Button type="submit">Criar</Button>
               </div>
             </form>
           </DialogContent>
         </Dialog>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {lists.map((list) => (
-          <ListCard
-            key={list.id}
-            list={list}
-            selected={selectedListId === list.id}
-            onSelect={() => onSelectList(list.id)}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            onShare={handleShare}
-          />
-        ))}
-      </div>
+      )}
     </div>
   );
 }

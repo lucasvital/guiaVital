@@ -14,6 +14,9 @@ import {
   arrayUnion,
   Timestamp,
   DocumentData,
+  getDoc,
+  getDocs,
+  or,
 } from 'firebase/firestore';
 
 interface FirestoreList extends DocumentData {
@@ -56,9 +59,13 @@ export function useLists(): UseListsReturn {
     setLoading(true);
     setError(null);
 
+    // Busca listas onde o usuário é dono ou está compartilhado
     const q = query(
       collection(db, 'lists'),
-      where('owner', '==', user.email)
+      or(
+        where('owner', '==', user.email),
+        where('sharedWith', 'array-contains', { email: user.email })
+      )
     );
 
     const unsubscribe = onSnapshot(q, 
@@ -116,6 +123,22 @@ export function useLists(): UseListsReturn {
 
     try {
       const listRef = doc(db, 'lists', listId);
+      const listDoc = await getDoc(listRef);
+
+      if (!listDoc.exists()) {
+        throw new Error('Lista não encontrada');
+      }
+
+      const listData = listDoc.data() as FirestoreList;
+      
+      // Verifica se o usuário tem permissão para editar
+      if (listData.owner !== user.email) {
+        const share = listData.sharedWith?.find(s => s.email === user.email);
+        if (!share || (share.permission !== 'write' && share.permission !== 'admin')) {
+          throw new Error('Você não tem permissão para editar esta lista');
+        }
+      }
+
       await updateDoc(listRef, {
         ...data,
         updatedAt: Timestamp.now(),
@@ -130,7 +153,24 @@ export function useLists(): UseListsReturn {
     if (!user) throw new Error('Must be logged in to delete a list');
 
     try {
-      await deleteDoc(doc(db, 'lists', listId));
+      const listRef = doc(db, 'lists', listId);
+      const listDoc = await getDoc(listRef);
+
+      if (!listDoc.exists()) {
+        throw new Error('Lista não encontrada');
+      }
+
+      const listData = listDoc.data() as FirestoreList;
+      
+      // Verifica se o usuário tem permissão para excluir
+      if (listData.owner !== user.email) {
+        const share = listData.sharedWith?.find(s => s.email === user.email);
+        if (!share || share.permission !== 'admin') {
+          throw new Error('Você não tem permissão para excluir esta lista');
+        }
+      }
+
+      await deleteDoc(listRef);
     } catch (error) {
       console.error('Error deleting list:', error);
       throw error;
@@ -142,12 +182,37 @@ export function useLists(): UseListsReturn {
 
     try {
       const listRef = doc(db, 'lists', listId);
+      const listDoc = await getDoc(listRef);
+
+      if (!listDoc.exists()) {
+        throw new Error('Lista não encontrada');
+      }
+
+      const listData = listDoc.data() as FirestoreList;
+      
+      if (listData.owner !== user.email) {
+        const share = listData.sharedWith?.find(s => s.email === user.email);
+        if (!share || share.permission !== 'admin') {
+          throw new Error('Você não tem permissão para compartilhar esta lista');
+        }
+      }
+
+      if (email === user.email) {
+        throw new Error('Você não pode compartilhar uma lista com você mesmo');
+      }
+
+      const sharedWith = listData.sharedWith || [];
+      const existingShare = sharedWith.find(share => share.email === email);
+
+      if (existingShare) {
+        throw new Error('Esta lista já foi compartilhada com este usuário');
+      }
+
       await updateDoc(listRef, {
         sharedWith: arrayUnion({
           email,
           permission,
           addedAt: Timestamp.now(),
-          addedBy: user.email,
         }),
       });
     } catch (error) {
