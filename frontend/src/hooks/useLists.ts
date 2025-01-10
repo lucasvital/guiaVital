@@ -16,6 +16,7 @@ import {
   Timestamp,
   DocumentData,
   getDoc,
+  getDocs,
 } from 'firebase/firestore';
 
 interface FirestoreList extends DocumentData {
@@ -81,6 +82,8 @@ export function useLists(): UseListsReturn {
     setLoading(true);
     setError(null);
 
+    console.log('Buscando listas para o usuário:', user.email);
+
     // Busca listas onde o usuário é dono
     const q = query(
       collection(db, 'lists'),
@@ -88,77 +91,51 @@ export function useLists(): UseListsReturn {
     );
 
     // Busca listas compartilhadas com o usuário
-    const readQuery = query(
+    const sharedQuery = query(
       collection(db, 'lists'),
-      where('sharedWith', 'array-contains', { 
+      where('sharedWith', 'array-contains', {
         email: user.email,
-        permission: 'read'
       })
     );
 
-    const writeQuery = query(
-      collection(db, 'lists'),
-      where('sharedWith', 'array-contains', { 
-        email: user.email,
-        permission: 'write'
-      })
-    );
+    const unsubscribe = onSnapshot(
+      q,
+      async (ownerSnapshot) => {
+        try {
+          // Buscar listas onde o usuário é dono
+          const ownerLists = ownerSnapshot.docs.map(convertFirestoreToList);
+          console.log('Listas onde o usuário é dono:', ownerLists);
 
-    const adminQuery = query(
-      collection(db, 'lists'),
-      where('sharedWith', 'array-contains', { 
-        email: user.email,
-        permission: 'admin'
-      })
-    );
+          // Buscar listas compartilhadas
+          const sharedSnapshot = await getDocs(sharedQuery);
+          const sharedLists = sharedSnapshot.docs.map(convertFirestoreToList);
+          console.log('Listas compartilhadas:', sharedLists);
 
-    // Primeiro, busca as listas onde o usuário é dono
-    const unsubscribeOwner = onSnapshot(q,
-      (ownerSnapshot) => {
-        const ownerLists = ownerSnapshot.docs.map(convertFirestoreToList);
-        console.log('Listas onde o usuário é dono:', ownerLists);
+          // Combinar todas as listas e remover duplicatas
+          const allLists = [...ownerLists, ...sharedLists]
+            .filter((list, index, self) => 
+              index === self.findIndex((t) => t.id === list.id)
+            );
 
-        // Depois, busca as listas compartilhadas com diferentes permissões
-        const unsubscribeRead = onSnapshot(readQuery, (readSnapshot) => {
-          const unsubscribeWrite = onSnapshot(writeQuery, (writeSnapshot) => {
-            const unsubscribeAdmin = onSnapshot(adminQuery, (adminSnapshot) => {
-              const readLists = readSnapshot.docs.map(convertFirestoreToList);
-              const writeLists = writeSnapshot.docs.map(convertFirestoreToList);
-              const adminLists = adminSnapshot.docs.map(convertFirestoreToList);
+          console.log('Total de listas após combinar:', allLists.length);
+          console.log('Todas as listas:', allLists);
 
-              console.log('Listas compartilhadas (read):', readLists);
-              console.log('Listas compartilhadas (write):', writeLists);
-              console.log('Listas compartilhadas (admin):', adminLists);
-
-              // Combinar todas as listas e remover duplicatas
-              const allLists = [...ownerLists, ...readLists, ...writeLists, ...adminLists]
-                .filter((list, index, self) => 
-                  index === self.findIndex((t) => t.id === list.id)
-                );
-
-              console.log('Total de listas após combinar:', allLists.length);
-              console.log('Todas as listas:', allLists);
-
-              setLists(allLists);
-              setLoading(false);
-            });
-
-            return () => unsubscribeAdmin();
-          });
-
-          return () => unsubscribeWrite();
-        });
-
-        return () => unsubscribeRead();
+          setLists(allLists);
+          setLoading(false);
+        } catch (error) {
+          console.error('Erro ao buscar listas:', error);
+          setError('Falha ao carregar listas. Por favor, tente novamente mais tarde.');
+          setLoading(false);
+        }
       },
       (error) => {
-        console.error('Error fetching lists:', error);
-        setError('Failed to load lists. Please try again later.');
+        console.error('Erro ao observar listas:', error);
+        setError('Falha ao carregar listas. Por favor, tente novamente mais tarde.');
         setLoading(false);
       }
     );
 
-    return () => unsubscribeOwner();
+    return () => unsubscribe();
   }, [user]);
 
   const createList = async (name: string, color: string, icon: string) => {

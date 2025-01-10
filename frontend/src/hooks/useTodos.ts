@@ -119,93 +119,78 @@ export function useTodos() {
     setLoading(true);
     setError(null);
 
+    console.log('Buscando tarefas para o usuário:', user.email);
+
     // Primeiro, buscar as listas compartilhadas com o usuário
     const listsRef = collection(db, 'lists');
-    const listsQuery = query(
+    const sharedListsQuery = query(
       listsRef,
-      where('sharedWith', 'array-contains', { email: user.email, permission: 'read' })
+      where('sharedWith', 'array-contains', { 
+        email: user.email 
+      })
     );
 
-    // Buscar IDs das listas compartilhadas
-    const unsubscribeLists = onSnapshot(listsQuery, async (listsSnapshot) => {
-      // Buscar todas as listas compartilhadas (read, write, admin)
-      const sharedListsQuery = query(
-        collection(db, 'lists'),
-        where('sharedWith', 'array-contains', { email: user.email })
-      );
+    const unsubscribe = onSnapshot(
+      sharedListsQuery,
+      async (listsSnapshot) => {
+        try {
+          // Pegar os IDs de todas as listas compartilhadas
+          const sharedListIds = listsSnapshot.docs.map(doc => doc.id);
+          console.log('IDs das listas compartilhadas:', sharedListIds);
 
-      const sharedListsSnapshot = await getDocs(sharedListsQuery);
-      const sharedListIds = sharedListsSnapshot.docs.map(doc => doc.id);
-
-      console.log('IDs das listas compartilhadas:', sharedListIds);
-
-      // Query para tarefas próprias do usuário
-      const ownTodosQuery = query(
-        collection(db, 'todos'),
-        where('ownerId', '==', user.uid)
-      );
-
-      // Query para tarefas das listas compartilhadas
-      const sharedTodosQuery = query(
-        collection(db, 'todos'),
-        where('list', 'in', sharedListIds.length > 0 ? sharedListIds : ['no-lists'])
-      );
-
-      // Combinar os resultados das duas queries
-      const unsubscribeOwnTodos = onSnapshot(
-        ownTodosQuery,
-        (ownTodosSnapshot) => {
-          const unsubscribeSharedTodos = onSnapshot(
-            sharedTodosQuery,
-            (sharedTodosSnapshot) => {
-              console.log('Tarefas próprias encontradas:', ownTodosSnapshot.docs.length);
-              console.log('Tarefas compartilhadas encontradas:', sharedTodosSnapshot.docs.length);
-
-              const ownTodos = ownTodosSnapshot.docs.map(doc => {
-                const todo = convertFirestoreToTodo(doc);
-                console.log('Tarefa própria:', todo);
-                return todo;
-              });
-
-              const sharedTodos = sharedTodosSnapshot.docs.map(doc => {
-                const todo = convertFirestoreToTodo(doc);
-                console.log('Tarefa compartilhada:', todo);
-                return todo;
-              });
-
-              // Combinar e remover duplicatas
-              const allTodos = [...ownTodos, ...sharedTodos].filter((todo, index, self) =>
-                index === self.findIndex((t) => t.id === todo.id)
-              );
-
-              console.log('Total de tarefas após combinar:', allTodos.length);
-              setTodos(allTodos);
-              setLoading(false);
-            },
-            (error) => {
-              console.error('Error fetching shared todos:', error);
-              setError('Failed to load todos. Please try again later.');
-              setLoading(false);
-            }
+          // Query para tarefas próprias do usuário
+          const ownTodosQuery = query(
+            collection(db, 'todos'),
+            where('ownerId', '==', user.uid)
           );
 
-          return () => unsubscribeSharedTodos();
-        },
-        (error) => {
-          console.error('Error fetching own todos:', error);
-          setError('Failed to load todos. Please try again later.');
+          // Query para tarefas das listas compartilhadas
+          const sharedTodosQuery = query(
+            collection(db, 'todos'),
+            where('list', 'in', sharedListIds.length > 0 ? sharedListIds : ['no-lists'])
+          );
+
+          // Buscar tarefas próprias
+          const ownTodosSnapshot = await getDocs(ownTodosQuery);
+          const ownTodos = ownTodosSnapshot.docs.map(doc => {
+            const todo = convertFirestoreToTodo(doc);
+            console.log('Tarefa própria:', todo);
+            return todo;
+          });
+
+          // Buscar tarefas das listas compartilhadas
+          const sharedTodosSnapshot = await getDocs(sharedTodosQuery);
+          const sharedTodos = sharedTodosSnapshot.docs.map(doc => {
+            const todo = convertFirestoreToTodo(doc);
+            console.log('Tarefa compartilhada:', todo);
+            return todo;
+          });
+
+          console.log('Tarefas próprias encontradas:', ownTodos.length);
+          console.log('Tarefas compartilhadas encontradas:', sharedTodos.length);
+
+          // Combinar e remover duplicatas
+          const allTodos = [...ownTodos, ...sharedTodos].filter((todo, index, self) =>
+            index === self.findIndex((t) => t.id === todo.id)
+          );
+
+          console.log('Total de tarefas após combinar:', allTodos.length);
+          setTodos(allTodos);
+          setLoading(false);
+        } catch (error) {
+          console.error('Erro ao buscar tarefas:', error);
+          setError('Falha ao carregar tarefas. Por favor, tente novamente mais tarde.');
           setLoading(false);
         }
-      );
+      },
+      (error) => {
+        console.error('Erro ao observar listas:', error);
+        setError('Falha ao carregar tarefas. Por favor, tente novamente mais tarde.');
+        setLoading(false);
+      }
+    );
 
-      return () => {
-        unsubscribeOwnTodos();
-      };
-    });
-
-    return () => {
-      unsubscribeLists();
-    };
+    return () => unsubscribe();
   }, [user]);
 
   const addTodo = async (todo: Partial<Todo>) => {
