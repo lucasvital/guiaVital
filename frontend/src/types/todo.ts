@@ -41,6 +41,13 @@ export interface Todo {
   updatedAt?: Date;
 }
 
+export interface SharedUser {
+  email: string;
+  permission: 'read' | 'write' | 'admin';
+  addedAt: Date;
+  addedBy?: string;
+}
+
 export interface List {
   id: string;
   name: string;
@@ -48,7 +55,7 @@ export interface List {
   icon?: string;
   createdBy: string;
   owner: string;
-  sharedWith: string[];
+  sharedWith: SharedUser[];
   members?: string[];
   createdAt: Date;
   updatedAt?: Date;

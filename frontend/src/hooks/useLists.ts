@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../config/firebase';
-import { List } from '../types/list';
+import { List, SharedUser } from '../types/todo';
 import { useNotifications } from './useNotifications';
 import {
   collection,
@@ -22,13 +22,16 @@ interface FirestoreList extends DocumentData {
   name: string;
   color: string;
   icon?: string;
+  createdBy: string;
   owner: string;
   sharedWith?: Array<{
     email: string;
     permission: 'read' | 'write' | 'admin';
     addedAt: Timestamp;
+    addedBy?: string;
   }>;
   createdAt: Timestamp;
+  updatedAt?: Timestamp;
   todos?: any[];
 }
 
@@ -41,6 +44,28 @@ interface UseListsReturn {
   deleteList: (listId: string) => Promise<void>;
   shareList: (listId: string, email: string, permission?: 'read' | 'write' | 'admin') => Promise<void>;
 }
+
+const convertFirestoreToList = (doc: DocumentData): List => {
+  const data = doc.data() as FirestoreList;
+  return {
+    id: doc.id,
+    name: data.name,
+    color: data.color,
+    icon: data.icon,
+    createdBy: data.owner,
+    owner: data.owner,
+    sharedWith: data.sharedWith?.map(share => ({
+      email: share.email,
+      permission: share.permission,
+      addedAt: share.addedAt.toDate(),
+      addedBy: share.addedBy || data.owner
+    })) || [],
+    members: [],
+    createdAt: data.createdAt.toDate(),
+    updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+    todos: data.todos || [],
+  };
+};
 
 export function useLists(): UseListsReturn {
   const [lists, setLists] = useState<List[]>([]);
@@ -93,89 +118,16 @@ export function useLists(): UseListsReturn {
     // Primeiro, busca as listas onde o usuário é dono
     const unsubscribeOwner = onSnapshot(q,
       (ownerSnapshot) => {
-        const ownerLists = ownerSnapshot.docs.map(doc => {
-          const data = doc.data() as FirestoreList;
-          console.log('Lista do usuário:', doc.id, data);
-
-          // Processar sharedWith com segurança
-          const processedSharedWith = data.sharedWith?.map(share => {
-            // Se share é uma string (email), converter para objeto
-            if (typeof share === 'string') {
-              return {
-                email: share,
-                permission: 'read',
-                addedAt: data.createdAt
-              };
-            }
-            // Se share é um objeto com addedAt, converter o timestamp
-            if (share.addedAt) {
-              return {
-                ...share,
-                addedAt: share.addedAt.toDate()
-              };
-            }
-            // Se share é um objeto sem addedAt, usar createdAt da lista
-            return {
-              ...share,
-              addedAt: data.createdAt.toDate()
-            };
-          }) || [];
-
-          return {
-            id: doc.id,
-            name: data.name,
-            color: data.color,
-            icon: data.icon,
-            owner: data.owner,
-            sharedWith: processedSharedWith,
-            createdAt: data.createdAt.toDate(),
-            todos: data.todos || [],
-          } as List;
-        });
-
+        const ownerLists = ownerSnapshot.docs.map(convertFirestoreToList);
         console.log('Listas onde o usuário é dono:', ownerLists);
 
         // Depois, busca as listas compartilhadas com diferentes permissões
         const unsubscribeRead = onSnapshot(readQuery, (readSnapshot) => {
           const unsubscribeWrite = onSnapshot(writeQuery, (writeSnapshot) => {
             const unsubscribeAdmin = onSnapshot(adminQuery, (adminSnapshot) => {
-              const processSharedList = (doc: any) => {
-                const data = doc.data();
-                const processedSharedWith = data.sharedWith?.map(share => {
-                  if (typeof share === 'string') {
-                    return {
-                      email: share,
-                      permission: 'read',
-                      addedAt: data.createdAt.toDate()
-                    };
-                  }
-                  if (share.addedAt) {
-                    return {
-                      ...share,
-                      addedAt: share.addedAt.toDate()
-                    };
-                  }
-                  return {
-                    ...share,
-                    addedAt: data.createdAt.toDate()
-                  };
-                }) || [];
-
-                return {
-                  id: doc.id,
-                  name: data.name,
-                  color: data.color,
-                  icon: data.icon,
-                  owner: data.owner,
-                  sharedWith: processedSharedWith,
-                  createdAt: data.createdAt.toDate(),
-                  todos: data.todos || [],
-                };
-              };
-
-              const readLists = readSnapshot.docs.map(processSharedList);
-              const writeLists = writeSnapshot.docs.map(processSharedList);
-              const adminLists = adminSnapshot.docs.map(processSharedList);
+              const readLists = readSnapshot.docs.map(convertFirestoreToList);
+              const writeLists = writeSnapshot.docs.map(convertFirestoreToList);
+              const adminLists = adminSnapshot.docs.map(convertFirestoreToList);
 
               console.log('Listas compartilhadas (read):', readLists);
               console.log('Listas compartilhadas (write):', writeLists);

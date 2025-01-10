@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { List } from '../../types/todo';
+import { List, SharedUser } from '../../types/todo';
 import {
   collection,
   query,
@@ -19,24 +19,44 @@ interface ListSelectProps {
   onChange: (value: string) => void;
 }
 
-interface SharedUser {
-  email: string;
-  permission: string;
-  addedAt: Timestamp;
-}
-
 interface FirestoreList {
   name: string;
   color: string;
   icon?: string;
   createdBy: string;
   owner: string;
-  sharedWith: SharedUser[];
-  members: string[];
+  sharedWith?: Array<{
+    email: string;
+    permission: 'read' | 'write' | 'admin';
+    addedAt: Timestamp;
+    addedBy?: string;
+  }>;
   createdAt: Timestamp;
-  updatedAt: Timestamp;
-  todos: any[];
+  updatedAt?: Timestamp;
+  todos?: any[];
 }
+
+const convertFirestoreToList = (doc: DocumentData): List => {
+  const data = doc.data() as FirestoreList;
+  return {
+    id: doc.id,
+    name: data.name,
+    color: data.color,
+    icon: data.icon,
+    createdBy: data.owner,
+    owner: data.owner,
+    sharedWith: data.sharedWith?.map(share => ({
+      email: share.email,
+      permission: share.permission,
+      addedAt: share.addedAt.toDate(),
+      addedBy: share.addedBy || data.owner
+    })) || [],
+    members: [],
+    createdAt: data.createdAt.toDate(),
+    updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+    todos: data.todos || [],
+  };
+};
 
 export function ListSelect({ value, onChange }: ListSelectProps) {
   const [lists, setLists] = useState<List[]>([]);
@@ -54,52 +74,58 @@ export function ListSelect({ value, onChange }: ListSelectProps) {
     );
 
     // Query para listas compartilhadas com o usuário
-    const sharedQuery = query(
+    const readQuery = query(
       listsRef,
-      where('sharedWith', 'array-contains', { email: user.email, permission: 'read' })
+      where('sharedWith', 'array-contains', { 
+        email: user.email,
+        permission: 'read'
+      })
     );
 
-    // Combinar os resultados das duas queries
-    const unsubscribeOwner = onSnapshot<FirestoreList, DocumentData>(ownerQuery, (ownerSnapshot) => {
-      const unsubscribeShared = onSnapshot<FirestoreList, DocumentData>(sharedQuery, (sharedSnapshot) => {
-        const ownerLists = ownerSnapshot.docs.map(doc => ({
-          id: doc.id,
-          name: doc.data().name,
-          color: doc.data().color,
-          icon: doc.data().icon,
-          createdBy: doc.data().createdBy,
-          owner: doc.data().owner,
-          sharedWith: doc.data().sharedWith || [],
-          members: doc.data().members || [],
-          createdAt: doc.data().createdAt?.toDate() || new Date(),
-          updatedAt: doc.data().updatedAt?.toDate(),
-          todos: doc.data().todos || [],
-        }));
+    const writeQuery = query(
+      listsRef,
+      where('sharedWith', 'array-contains', { 
+        email: user.email,
+        permission: 'write'
+      })
+    );
 
-        const sharedLists = sharedSnapshot.docs.map(doc => ({
-          id: doc.id,
-          name: doc.data().name,
-          color: doc.data().color,
-          icon: doc.data().icon,
-          createdBy: doc.data().createdBy,
-          owner: doc.data().owner,
-          sharedWith: doc.data().sharedWith || [],
-          members: doc.data().members || [],
-          createdAt: doc.data().createdAt?.toDate() || new Date(),
-          updatedAt: doc.data().updatedAt?.toDate(),
-          todos: doc.data().todos || [],
-        }));
+    const adminQuery = query(
+      listsRef,
+      where('sharedWith', 'array-contains', { 
+        email: user.email,
+        permission: 'admin'
+      })
+    );
 
-        // Combinar e remover duplicatas
-        const allLists = [...ownerLists, ...sharedLists];
-        const uniqueLists = allLists.filter((list, index, self) =>
-          index === self.findIndex((l) => l.id === list.id)
-        );
+    // Primeiro, busca as listas onde o usuário é dono
+    const unsubscribeOwner = onSnapshot(ownerQuery, (ownerSnapshot) => {
+      const ownerLists = ownerSnapshot.docs.map(convertFirestoreToList);
 
-        setLists(uniqueLists);
+      // Depois, busca as listas compartilhadas
+      const unsubscribeRead = onSnapshot(readQuery, (readSnapshot) => {
+        const unsubscribeWrite = onSnapshot(writeQuery, (writeSnapshot) => {
+          const unsubscribeAdmin = onSnapshot(adminQuery, (adminSnapshot) => {
+            const readLists = readSnapshot.docs.map(convertFirestoreToList);
+            const writeLists = writeSnapshot.docs.map(convertFirestoreToList);
+            const adminLists = adminSnapshot.docs.map(convertFirestoreToList);
+
+            // Combinar todas as listas e remover duplicatas
+            const allLists = [...ownerLists, ...readLists, ...writeLists, ...adminLists]
+              .filter((list, index, self) => 
+                index === self.findIndex((t) => t.id === list.id)
+              );
+
+            setLists(allLists);
+          });
+
+          return () => unsubscribeAdmin();
+        });
+
+        return () => unsubscribeWrite();
       });
 
-      return () => unsubscribeShared();
+      return () => unsubscribeRead();
     });
 
     return () => unsubscribeOwner();
