@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { List, SharedUser } from '../../types/todo';
+import { List } from '../../types/list';
 import {
   collection,
   query,
@@ -23,13 +23,12 @@ interface FirestoreList {
   name: string;
   color: string;
   icon?: string;
-  createdBy: string;
   owner: string;
   sharedWith?: Array<{
     email: string;
     permission: 'read' | 'write' | 'admin';
     addedAt: Timestamp;
-    addedBy?: string;
+    addedBy: string;
   }>;
   createdAt: Timestamp;
   updatedAt?: Timestamp;
@@ -43,15 +42,13 @@ const convertFirestoreToList = (doc: DocumentData): List => {
     name: data.name,
     color: data.color,
     icon: data.icon,
-    createdBy: data.owner,
     owner: data.owner,
     sharedWith: data.sharedWith?.map(share => ({
       email: share.email,
       permission: share.permission,
       addedAt: share.addedAt.toDate(),
-      addedBy: share.addedBy || data.owner
+      addedBy: share.addedBy
     })) || [],
-    members: [],
     createdAt: data.createdAt.toDate(),
     updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
     todos: data.todos || [],

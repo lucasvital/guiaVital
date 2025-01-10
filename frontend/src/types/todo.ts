@@ -1,4 +1,5 @@
 import { Timestamp } from 'firebase/firestore';
+import { List } from './list';
 
 export type Priority = 'low' | 'medium' | 'high' | 'LOW' | 'MEDIUM' | 'HIGH';
 
@@ -46,20 +47,6 @@ export interface SharedUser {
   permission: 'read' | 'write' | 'admin';
   addedAt: Date;
   addedBy?: string;
-}
-
-export interface List {
-  id: string;
-  name: string;
-  color: string;
-  icon?: string;
-  createdBy: string;
-  owner: string;
-  sharedWith: SharedUser[];
-  members?: string[];
-  createdAt: Date;
-  updatedAt?: Date;
-  todos?: Todo[];
 }
 
 export interface TodoList {
