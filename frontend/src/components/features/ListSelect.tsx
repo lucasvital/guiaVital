@@ -40,32 +40,63 @@ export function ListSelect({ value, onChange }: ListSelectProps) {
     if (!user) return;
 
     const listsRef = collection(db, 'lists') as CollectionReference<FirestoreList>;
-    const q = query(
+    
+    // Query para listas que o usuário é dono
+    const ownerQuery = query(
       listsRef,
-      where('owner', '==', user.uid)
+      where('owner', 'in', [user.uid, user.email])
     );
 
-    const unsubscribe = onSnapshot<FirestoreList, DocumentData>(q, (snapshot: QuerySnapshot<FirestoreList>) => {
-      const listsData = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
+    // Query para listas compartilhadas com o usuário
+    const sharedQuery = query(
+      listsRef,
+      where('sharedWith', 'array-contains', user.email)
+    );
+
+    // Combinar os resultados das duas queries
+    const unsubscribeOwner = onSnapshot<FirestoreList, DocumentData>(ownerQuery, (ownerSnapshot) => {
+      const unsubscribeShared = onSnapshot<FirestoreList, DocumentData>(sharedQuery, (sharedSnapshot) => {
+        const ownerLists = ownerSnapshot.docs.map(doc => ({
           id: doc.id,
-          name: data.name,
-          color: data.color,
-          icon: data.icon,
-          createdBy: data.createdBy,
-          owner: data.owner || user.uid,
-          sharedWith: data.sharedWith || [],
-          members: data.members || [],
-          createdAt: data.createdAt?.toDate() || new Date(),
-          updatedAt: data.updatedAt?.toDate(),
-          todos: data.todos || [],
-        };
+          name: doc.data().name,
+          color: doc.data().color,
+          icon: doc.data().icon,
+          createdBy: doc.data().createdBy,
+          owner: doc.data().owner,
+          sharedWith: doc.data().sharedWith || [],
+          members: doc.data().members || [],
+          createdAt: doc.data().createdAt?.toDate() || new Date(),
+          updatedAt: doc.data().updatedAt?.toDate(),
+          todos: doc.data().todos || [],
+        }));
+
+        const sharedLists = sharedSnapshot.docs.map(doc => ({
+          id: doc.id,
+          name: doc.data().name,
+          color: doc.data().color,
+          icon: doc.data().icon,
+          createdBy: doc.data().createdBy,
+          owner: doc.data().owner,
+          sharedWith: doc.data().sharedWith || [],
+          members: doc.data().members || [],
+          createdAt: doc.data().createdAt?.toDate() || new Date(),
+          updatedAt: doc.data().updatedAt?.toDate(),
+          todos: doc.data().todos || [],
+        }));
+
+        // Combinar e remover duplicatas
+        const allLists = [...ownerLists, ...sharedLists];
+        const uniqueLists = allLists.filter((list, index, self) =>
+          index === self.findIndex((l) => l.id === list.id)
+        );
+
+        setLists(uniqueLists);
       });
-      setLists(listsData);
+
+      return () => unsubscribeShared();
     });
 
-    return () => unsubscribe();
+    return () => unsubscribeOwner();
   }, [user]);
 
   return (

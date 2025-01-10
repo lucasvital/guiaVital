@@ -59,25 +59,23 @@ export function useLists(): UseListsReturn {
     setLoading(true);
     setError(null);
 
-    // Busca todas as listas
+    // Busca listas onde o usuário é dono
     const q = query(
       collection(db, 'lists'),
       where('owner', '==', user.email)
     );
 
-    // Busca listas compartilhadas
-    const sharedQ = query(
+    const sharedQuery = query(
       collection(db, 'lists'),
       where('sharedWith', 'array-contains', { email: user.email })
     );
 
-    let allLists: List[] = [];
-
-    // Inscreve-se para atualizações das listas do usuário
-    const unsubscribeOwner = onSnapshot(q, 
-      (snapshot) => {
-        const ownerLists = snapshot.docs.map(doc => {
+    // Primeiro, busca as listas onde o usuário é dono
+    const unsubscribeOwner = onSnapshot(q,
+      (ownerSnapshot) => {
+        const ownerLists = ownerSnapshot.docs.map(doc => {
           const data = doc.data() as FirestoreList;
+          console.log('Lista do usuário:', doc.id, data);
           return {
             id: doc.id,
             name: data.name,
@@ -92,50 +90,54 @@ export function useLists(): UseListsReturn {
             todos: data.todos || [],
           } as List;
         });
-        allLists = [...ownerLists];
-        setLists(allLists);
+
+        // Depois, busca as listas compartilhadas
+        const unsubscribeShared = onSnapshot(sharedQuery,
+          (sharedSnapshot) => {
+            const sharedLists = sharedSnapshot.docs.map(doc => {
+              const data = doc.data() as FirestoreList;
+              console.log('Lista compartilhada:', doc.id, data);
+              return {
+                id: doc.id,
+                name: data.name,
+                color: data.color,
+                icon: data.icon,
+                owner: data.owner,
+                sharedWith: data.sharedWith?.map(share => ({
+                  ...share,
+                  addedAt: share.addedAt.toDate(),
+                })) || [],
+                createdAt: data.createdAt.toDate(),
+                todos: data.todos || [],
+              } as List;
+            });
+
+            // Remove duplicatas (caso uma lista seja tanto do usuário quanto compartilhada)
+            const allLists = [...ownerLists, ...sharedLists].filter((list, index, self) =>
+              index === self.findIndex((t) => t.id === list.id)
+            );
+            
+            console.log('Todas as listas:', allLists);
+            setLists(allLists);
+            setLoading(false);
+          },
+          (error) => {
+            console.error('Error fetching shared lists:', error);
+            setError('Failed to load lists. Please try again later.');
+            setLoading(false);
+          }
+        );
+
+        return () => unsubscribeShared();
       },
       (error) => {
-        console.error('Error fetching lists:', error);
+        console.error('Error fetching owner lists:', error);
         setError('Failed to load lists. Please try again later.');
         setLoading(false);
       }
     );
 
-    // Inscreve-se para atualizações das listas compartilhadas
-    const unsubscribeShared = onSnapshot(sharedQ,
-      (snapshot) => {
-        const sharedLists = snapshot.docs.map(doc => {
-          const data = doc.data() as FirestoreList;
-          return {
-            id: doc.id,
-            name: data.name,
-            color: data.color,
-            icon: data.icon,
-            owner: data.owner,
-            sharedWith: data.sharedWith?.map(share => ({
-              ...share,
-              addedAt: share.addedAt.toDate(),
-            })) || [],
-            createdAt: data.createdAt.toDate(),
-            todos: data.todos || [],
-          } as List;
-        });
-        allLists = [...allLists, ...sharedLists];
-        setLists(allLists);
-        setLoading(false);
-      },
-      (error) => {
-        console.error('Error fetching shared lists:', error);
-        setError('Failed to load lists. Please try again later.');
-        setLoading(false);
-      }
-    );
-
-    return () => {
-      unsubscribeOwner();
-      unsubscribeShared();
-    };
+    return () => unsubscribeOwner();
   }, [user]);
 
   const createList = async (name: string, color: string, icon: string) => {

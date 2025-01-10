@@ -16,6 +16,7 @@ import { Calendar } from '../ui/calendar';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PrioritySelect } from '../features/PrioritySelect';
+import { ListSelect } from '../features/ListSelect';
 
 interface TaskFormProps {
   onSubmit?: (task: Task) => void;
@@ -116,6 +117,14 @@ export function TaskForm({ onSubmit, onCancel }: TaskFormProps) {
           id="description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="list">Lista</Label>
+        <ListSelect
+          value={listId || 'none'}
+          onChange={setListId}
         />
       </div>
 

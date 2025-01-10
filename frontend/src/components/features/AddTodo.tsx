@@ -6,6 +6,7 @@ import { TagManager } from './TagManager';
 import { SubTaskManager } from './SubTaskManager';
 import { PrioritySelect } from './PrioritySelect';
 import { DatePicker } from './DatePicker';
+import { ListSelect } from './ListSelect';
 import { useAuth } from '../../contexts/AuthContext';
 import { db } from '../../config/firebase';
 import { addDoc, collection, Timestamp } from 'firebase/firestore';
@@ -37,6 +38,7 @@ export function AddTodo({ onClose, listId }: AddTodoProps) {
   const [reminder, setReminder] = useState<Date | null>(null);
   const [tags, setTags] = useState<Tag[]>([]);
   const [subtasks, setSubtasks] = useState<SubTask[]>([]);
+  const [selectedListId, setSelectedListId] = useState<string>(listId || 'none');
   const { user } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -54,7 +56,7 @@ export function AddTodo({ onClose, listId }: AddTodoProps) {
         createdAt: Timestamp.now(),
         dueDate: dueDate ? Timestamp.fromDate(dueDate) : null,
         reminder: reminder ? Timestamp.fromDate(reminder) : null,
-        list: listId || null,
+        list: selectedListId === 'none' ? null : selectedListId,
       };
 
       await addDoc(collection(db, 'todos'), firestoreTodo);
@@ -89,13 +91,23 @@ export function AddTodo({ onClose, listId }: AddTodoProps) {
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
+            <Label>Lista</Label>
+            <ListSelect
+              value={selectedListId}
+              onChange={setSelectedListId}
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label>Prioridade</Label>
             <PrioritySelect
               value={priority}
               onChange={setPriority}
             />
           </div>
+        </div>
 
+        <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label>Data de vencimento</Label>
             <DatePicker
@@ -103,27 +115,23 @@ export function AddTodo({ onClose, listId }: AddTodoProps) {
               onChange={setDueDate}
             />
           </div>
+
+          <div className="space-y-2">
+            <Label>Lembrete</Label>
+            <DatePicker
+              value={reminder}
+              onChange={setReminder}
+            />
+          </div>
         </div>
 
         <div className="space-y-2">
-          <Label>Lembrete</Label>
-          <DatePicker
-            value={reminder}
-            onChange={setReminder}
+          <Label>Tags</Label>
+          <TagManager
+            tags={tags}
+            onChange={setTags}
           />
         </div>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="space-y-2">
-              <Label>Tags</Label>
-              <TagManager
-                tags={tags}
-                onChange={setTags}
-              />
-            </div>
-          </CardContent>
-        </Card>
 
         <Card>
           <CardContent className="pt-6">
