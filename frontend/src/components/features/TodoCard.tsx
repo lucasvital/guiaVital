@@ -49,8 +49,9 @@ export function TodoCard({
   const { categories } = useCategories();
   const { lists } = useLists();
 
-  const category = categories.find(c => c.id === todo.categoryId);
-  const list = lists.find(l => l.id === todo.listId);
+  const category = categories?.find(c => c.id === todo.categoryId);
+  const list = lists?.find(l => l.id === todo.listId);
+  const subtasks = todo.subtasks || [];
 
   return (
     <Card className="p-4">
@@ -136,9 +137,9 @@ export function TodoCard({
           </div>
 
           {/* Subtarefas */}
-          {todo.subtasks.length > 0 && (
+          {subtasks.length > 0 && (
             <div className="mt-2 text-sm text-muted-foreground">
-              {todo.subtasks.filter((st: SubTask) => st.completed).length} de {todo.subtasks.length} subtarefas completas
+              {subtasks.filter((st: SubTask) => st.completed).length} de {subtasks.length} subtarefas completas
             </div>
           )}
         </div>

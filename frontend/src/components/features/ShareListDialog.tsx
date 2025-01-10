@@ -6,7 +6,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '../ui/dialog';
 import {
   Select,
@@ -15,17 +14,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../ui/select';
-import { Share } from 'lucide-react';
+import { Share2 } from 'lucide-react';
 
 interface ShareListDialogProps {
   listId: string;
   onShare: (email: string, permission: 'read' | 'write' | 'admin') => Promise<void>;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
-export function ShareListDialog({ listId, onShare }: ShareListDialogProps) {
+export function ShareListDialog({ listId, onShare, open, onOpenChange }: ShareListDialogProps) {
   const [email, setEmail] = useState('');
   const [permission, setPermission] = useState<'read' | 'write' | 'admin'>('read');
-  const [isOpen, setIsOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleShare = async () => {
@@ -39,20 +39,14 @@ export function ShareListDialog({ listId, onShare }: ShareListDialogProps) {
       setEmail('');
       setPermission('read');
       setError(null);
-      setIsOpen(false);
     } catch (error) {
       setError('Erro ao compartilhar lista');
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="icon">
-          <Share className="h-4 w-4" />
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent onClick={(e) => e.stopPropagation()}>
         <DialogHeader>
           <DialogTitle>Compartilhar Lista</DialogTitle>
         </DialogHeader>

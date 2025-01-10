@@ -148,7 +148,7 @@ export default function TodoList() {
                 <TodoCard
                   key={todo.id}
                   todo={todo}
-                  onToggleComplete={() => toggleTodo(todo.id, !todo.completed)}
+                  onToggleComplete={() => toggleTodo(todo.id)}
                   onDelete={() => deleteTodo(todo.id)}
                   onUpdate={(data) => updateTodo(todo.id, data)}
                 />

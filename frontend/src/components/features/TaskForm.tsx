@@ -1,170 +1,156 @@
 import { useState } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
-import { useAuth } from '../../contexts/AuthContext';
-import { Priority } from '../../types/todo';
-import {
-  addDoc,
-  collection,
-  serverTimestamp,
-} from 'firebase/firestore';
-import { db } from '../../config/firebase';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar } from '../ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { cn } from '../../lib/utils';
 import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { PrioritySelect } from '../features/PrioritySelect';
-import { ListSelect } from '../features/ListSelect';
+import { CalendarIcon } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../ui/select';
+import { useLists } from '../../hooks/useLists';
+import { useAuth } from '../../contexts/AuthContext';
+import { Priority, Todo } from '../../types/todo';
+import { serverTimestamp } from 'firebase/firestore';
 
 interface TaskFormProps {
-  onSubmit?: (task: Task) => void;
+  onSubmit: (task: Omit<Todo, 'id' | 'createdAt' | 'updatedAt'>) => void;
   onCancel?: () => void;
 }
 
-interface Task {
-  id?: string;
-  title: string;
-  description?: string;
-  completed: boolean;
-  dueDate?: Date;
-  priority: Priority;
-  listId?: string;
-  categoryId?: string;
-  assignedTo?: string[];
-  templateId?: string;
-  createdBy?: string;
-  createdAt: any;
-  updatedAt: any;
-}
-
 export function TaskForm({ onSubmit, onCancel }: TaskFormProps) {
-  const { user } = useAuth();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [dueDate, setDueDate] = useState<Date>();
+  const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
   const [priority, setPriority] = useState<Priority>('MEDIUM');
-  const [listId, setListId] = useState<string>();
+  const [listId, setListId] = useState<string>('');
+  const { lists } = useLists();
+  const { user } = useAuth();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Filtrar apenas listas que o usuário pode editar
+  const editableLists = lists.filter(list => {
+    const isOwner = list.owner === user?.email;
+    const share = list.sharedWith?.find(s => s.email === user?.email);
+    return isOwner || (share && (share.permission === 'write' || share.permission === 'admin'));
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user?.email || !title.trim() || !listId) return;
 
-    if (!user) {
-      console.error('No user found');
-      return;
-    }
+    const task: Omit<Todo, 'id' | 'createdAt' | 'updatedAt'> = {
+      title: title.trim(),
+      description: description.trim(),
+      completed: false,
+      dueDate,
+      priority,
+      listId,
+      userId: user.uid,
+      tags: [],
+      subtasks: [],
+    };
 
-    if (!title.trim()) {
-      console.error('Title is required');
-      return;
-    }
+    onSubmit(task);
+    
+    // Reset form
+    setTitle('');
+    setDescription('');
+    setDueDate(undefined);
+    setPriority('MEDIUM');
+    setListId('');
 
-    try {
-      const task = {
-        title: title.trim(),
-        description: description.trim(),
-        completed: false,
-        dueDate,
-        priority,
-        listId,
-        userId: user.uid,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        tags: [],
-        subtasks: [],
-      };
-
-      console.log('Submitting task:', task); // Debug log
-
-      const docRef = await addDoc(collection(db, 'todos'), task);
-      console.log('Document written with ID: ', docRef.id);
-
-      if (onSubmit) {
-        onSubmit({ ...task, id: docRef.id });
-      }
-
-      // Reset form
-      setTitle('');
-      setDescription('');
-      setDueDate(undefined);
-      setPriority('MEDIUM');
-      setListId(undefined);
-
-      if (onCancel) {
-        onCancel();
-      }
-    } catch (error) {
-      console.error('Error adding task:', error);
+    if (onCancel) {
+      onCancel();
     }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="title">Título</Label>
+      <div className="grid gap-2">
         <Input
-          id="title"
+          type="text"
+          placeholder="Título da tarefa"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           required
         />
       </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="description">Descrição</Label>
+      <div className="grid gap-2">
         <Textarea
-          id="description"
+          placeholder="Descrição"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
       </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="list">Lista</Label>
-        <ListSelect
-          value={listId || 'none'}
-          onChange={setListId}
-        />
+      <div className="grid gap-2">
+        <Select 
+          value={listId} 
+          onValueChange={(value: string) => setListId(value)}
+          required
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Selecione uma lista" />
+          </SelectTrigger>
+          <SelectContent>
+            {editableLists.map((list) => (
+              <SelectItem key={list.id} value={list.id}>
+                <div className="flex items-center gap-2">
+                  <span 
+                    className="w-2 h-2 rounded-full" 
+                    style={{ backgroundColor: list.color }} 
+                  />
+                  {list.name}
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="priority">Prioridade</Label>
-        <PrioritySelect
-          value={priority}
-          onChange={setPriority}
-        />
+      <div className="grid gap-2">
+        <Select value={priority} onValueChange={(value: Priority) => setPriority(value)}>
+          <SelectTrigger>
+            <SelectValue placeholder="Prioridade" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="LOW">Baixa</SelectItem>
+            <SelectItem value="MEDIUM">Média</SelectItem>
+            <SelectItem value="HIGH">Alta</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
-
-      <div className="flex gap-4">
-        <div>
-          <Label>Data de Vencimento</Label>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline">
-                {dueDate ? format(dueDate, "PPP", { locale: ptBR }) : "Selecionar data"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0">
-              <Calendar
-                mode="single"
-                selected={dueDate}
-                onSelect={setDueDate}
-                locale={ptBR}
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
+      <div className="grid gap-2">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant={"outline"}
+              className={cn(
+                "justify-start text-left font-normal",
+                !dueDate && "text-muted-foreground"
+              )}
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {dueDate ? format(dueDate, "PPP") : <span>Data de vencimento</span>}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0">
+            <Calendar
+              mode="single"
+              selected={dueDate}
+              onSelect={(date: Date | undefined) => setDueDate(date)}
+              initialFocus
+            />
+          </PopoverContent>
+        </Popover>
       </div>
-
-      <div className="flex justify-end gap-2">
-        {onCancel && (
-          <Button type="button" variant="outline" onClick={onCancel}>
-            Cancelar
-          </Button>
-        )}
-        <Button type="submit">Adicionar Tarefa</Button>
-      </div>
+      <Button type="submit" className="w-full">
+        Adicionar Tarefa
+      </Button>
     </form>
   );
 }

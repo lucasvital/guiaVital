@@ -6,12 +6,19 @@ import { TagManager } from './TagManager';
 import { SubTaskManager } from './SubTaskManager';
 import { PrioritySelect } from './PrioritySelect';
 import { DatePicker } from './DatePicker';
-import { ListSelect } from './ListSelect';
 import { useAuth } from '../../contexts/AuthContext';
+import { useLists } from '../../hooks/useLists';
 import { db } from '../../config/firebase';
 import { addDoc, collection, Timestamp } from 'firebase/firestore';
 import { Todo, Tag, SubTask, Priority } from '../../types/todo';
 import { Card, CardContent } from '../ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../ui/select';
 
 interface AddTodoProps {
   onClose?: () => void;
@@ -22,7 +29,7 @@ interface FirestoreTodo {
   completed: boolean;
   createdAt: Timestamp;
   dueDate: Timestamp | null;
-  list: string | null;
+  listId: string | null;
   ownerId: string;
   priority: Priority;
   reminder: Timestamp | null;
@@ -31,19 +38,27 @@ interface FirestoreTodo {
   text: string;
 }
 
-export function AddTodo({ onClose, listId }: AddTodoProps) {
+export function AddTodo({ onClose, listId: defaultListId }: AddTodoProps) {
   const [text, setText] = useState('');
   const [priority, setPriority] = useState<Priority>('MEDIUM');
   const [dueDate, setDueDate] = useState<Date | null>(null);
   const [reminder, setReminder] = useState<Date | null>(null);
   const [tags, setTags] = useState<Tag[]>([]);
   const [subtasks, setSubtasks] = useState<SubTask[]>([]);
-  const [selectedListId, setSelectedListId] = useState<string>(listId || 'none');
+  const [selectedListId, setSelectedListId] = useState<string | null>(defaultListId || null);
   const { user } = useAuth();
+  const { lists } = useLists();
+
+  // Filtrar apenas listas que o usuário pode editar
+  const editableLists = lists.filter(list => {
+    const isOwner = list.owner === user?.email;
+    const share = list.sharedWith?.find(s => s.email === user?.email);
+    return isOwner || (share && (share.permission === 'write' || share.permission === 'admin'));
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !text.trim()) return;
+    if (!user || !text.trim() || !selectedListId) return;
 
     try {
       const firestoreTodo: FirestoreTodo = {
@@ -56,12 +71,10 @@ export function AddTodo({ onClose, listId }: AddTodoProps) {
         createdAt: Timestamp.now(),
         dueDate: dueDate ? Timestamp.fromDate(dueDate) : null,
         reminder: reminder ? Timestamp.fromDate(reminder) : null,
-        list: selectedListId === 'none' ? null : selectedListId,
+        listId: selectedListId,
       };
 
-      console.log('Criando tarefa:', firestoreTodo);
-      const docRef = await addDoc(collection(db, 'todos'), firestoreTodo);
-      console.log('Tarefa criada com ID:', docRef.id);
+      await addDoc(collection(db, 'todos'), firestoreTodo);
 
       // Limpar o formulário e fechar
       setText('');
@@ -91,15 +104,33 @@ export function AddTodo({ onClose, listId }: AddTodoProps) {
           />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label>Lista</Label>
-            <ListSelect
-              value={selectedListId}
-              onChange={setSelectedListId}
-            />
-          </div>
+        <div className="space-y-2">
+          <Label>Lista</Label>
+          <Select 
+            value={selectedListId || ''} 
+            onValueChange={setSelectedListId}
+            required
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione uma lista" />
+            </SelectTrigger>
+            <SelectContent>
+              {editableLists.map((list) => (
+                <SelectItem key={list.id} value={list.id}>
+                  <div className="flex items-center gap-2">
+                    <span 
+                      className="w-2 h-2 rounded-full" 
+                      style={{ backgroundColor: list.color }} 
+                    />
+                    {list.name}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
+        <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label>Prioridade</Label>
             <PrioritySelect
@@ -107,9 +138,7 @@ export function AddTodo({ onClose, listId }: AddTodoProps) {
               onChange={setPriority}
             />
           </div>
-        </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label>Data de vencimento</Label>
             <DatePicker
@@ -117,14 +146,14 @@ export function AddTodo({ onClose, listId }: AddTodoProps) {
               onChange={setDueDate}
             />
           </div>
+        </div>
 
-          <div className="space-y-2">
-            <Label>Lembrete</Label>
-            <DatePicker
-              value={reminder}
-              onChange={setReminder}
-            />
-          </div>
+        <div className="space-y-2">
+          <Label>Lembrete</Label>
+          <DatePicker
+            value={reminder}
+            onChange={setReminder}
+          />
         </div>
 
         <div className="space-y-2">
@@ -135,28 +164,22 @@ export function AddTodo({ onClose, listId }: AddTodoProps) {
           />
         </div>
 
-        <Card>
-          <CardContent className="pt-6">
-            <div className="space-y-2">
-              <Label>Subtarefas</Label>
-              <SubTaskManager
-                subtasks={subtasks}
-                onChange={setSubtasks}
-              />
-            </div>
-          </CardContent>
-        </Card>
+        <div className="space-y-2">
+          <Label>Subtarefas</Label>
+          <SubTaskManager
+            subtasks={subtasks}
+            onChange={setSubtasks}
+          />
+        </div>
       </div>
 
-      <div className="flex justify-end gap-2 pt-4 border-t">
+      <div className="flex justify-end gap-2">
         {onClose && (
           <Button type="button" variant="outline" onClick={onClose}>
             Cancelar
           </Button>
         )}
-        <Button type="submit" className="min-w-[100px]">
-          Criar Tarefa
-        </Button>
+        <Button type="submit">Adicionar Tarefa</Button>
       </div>
     </form>
   );
