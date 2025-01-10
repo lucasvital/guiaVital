@@ -19,13 +19,19 @@ interface ListSelectProps {
   onChange: (value: string) => void;
 }
 
+interface SharedUser {
+  email: string;
+  permission: string;
+  addedAt: Timestamp;
+}
+
 interface FirestoreList {
   name: string;
   color: string;
   icon?: string;
   createdBy: string;
   owner: string;
-  sharedWith: string[];
+  sharedWith: SharedUser[];
   members: string[];
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -50,7 +56,7 @@ export function ListSelect({ value, onChange }: ListSelectProps) {
     // Query para listas compartilhadas com o usuário
     const sharedQuery = query(
       listsRef,
-      where('sharedWith', 'array-contains', user.email)
+      where('sharedWith', 'array-contains', { email: user.email, permission: 'read' })
     );
 
     // Combinar os resultados das duas queries

@@ -62,12 +62,32 @@ export function useLists(): UseListsReturn {
     // Busca listas onde o usuário é dono
     const q = query(
       collection(db, 'lists'),
-      where('owner', '==', user.email)
+      where('owner', 'in', [user.uid, user.email])
     );
 
-    const sharedQuery = query(
+    // Busca listas compartilhadas com o usuário
+    const readQuery = query(
       collection(db, 'lists'),
-      where('sharedWith', 'array-contains', { email: user.email })
+      where('sharedWith', 'array-contains', { 
+        email: user.email,
+        permission: 'read'
+      })
+    );
+
+    const writeQuery = query(
+      collection(db, 'lists'),
+      where('sharedWith', 'array-contains', { 
+        email: user.email,
+        permission: 'write'
+      })
+    );
+
+    const adminQuery = query(
+      collection(db, 'lists'),
+      where('sharedWith', 'array-contains', { 
+        email: user.email,
+        permission: 'admin'
+      })
     );
 
     // Primeiro, busca as listas onde o usuário é dono
@@ -76,62 +96,114 @@ export function useLists(): UseListsReturn {
         const ownerLists = ownerSnapshot.docs.map(doc => {
           const data = doc.data() as FirestoreList;
           console.log('Lista do usuário:', doc.id, data);
+
+          // Processar sharedWith com segurança
+          const processedSharedWith = data.sharedWith?.map(share => {
+            // Se share é uma string (email), converter para objeto
+            if (typeof share === 'string') {
+              return {
+                email: share,
+                permission: 'read',
+                addedAt: data.createdAt
+              };
+            }
+            // Se share é um objeto com addedAt, converter o timestamp
+            if (share.addedAt) {
+              return {
+                ...share,
+                addedAt: share.addedAt.toDate()
+              };
+            }
+            // Se share é um objeto sem addedAt, usar createdAt da lista
+            return {
+              ...share,
+              addedAt: data.createdAt.toDate()
+            };
+          }) || [];
+
           return {
             id: doc.id,
             name: data.name,
             color: data.color,
             icon: data.icon,
             owner: data.owner,
-            sharedWith: data.sharedWith?.map(share => ({
-              ...share,
-              addedAt: share.addedAt.toDate(),
-            })) || [],
+            sharedWith: processedSharedWith,
             createdAt: data.createdAt.toDate(),
             todos: data.todos || [],
           } as List;
         });
 
-        // Depois, busca as listas compartilhadas
-        const unsubscribeShared = onSnapshot(sharedQuery,
-          (sharedSnapshot) => {
-            const sharedLists = sharedSnapshot.docs.map(doc => {
-              const data = doc.data() as FirestoreList;
-              console.log('Lista compartilhada:', doc.id, data);
-              return {
-                id: doc.id,
-                name: data.name,
-                color: data.color,
-                icon: data.icon,
-                owner: data.owner,
-                sharedWith: data.sharedWith?.map(share => ({
-                  ...share,
-                  addedAt: share.addedAt.toDate(),
-                })) || [],
-                createdAt: data.createdAt.toDate(),
-                todos: data.todos || [],
-              } as List;
+        console.log('Listas onde o usuário é dono:', ownerLists);
+
+        // Depois, busca as listas compartilhadas com diferentes permissões
+        const unsubscribeRead = onSnapshot(readQuery, (readSnapshot) => {
+          const unsubscribeWrite = onSnapshot(writeQuery, (writeSnapshot) => {
+            const unsubscribeAdmin = onSnapshot(adminQuery, (adminSnapshot) => {
+              const processSharedList = (doc: any) => {
+                const data = doc.data();
+                const processedSharedWith = data.sharedWith?.map(share => {
+                  if (typeof share === 'string') {
+                    return {
+                      email: share,
+                      permission: 'read',
+                      addedAt: data.createdAt.toDate()
+                    };
+                  }
+                  if (share.addedAt) {
+                    return {
+                      ...share,
+                      addedAt: share.addedAt.toDate()
+                    };
+                  }
+                  return {
+                    ...share,
+                    addedAt: data.createdAt.toDate()
+                  };
+                }) || [];
+
+                return {
+                  id: doc.id,
+                  name: data.name,
+                  color: data.color,
+                  icon: data.icon,
+                  owner: data.owner,
+                  sharedWith: processedSharedWith,
+                  createdAt: data.createdAt.toDate(),
+                  todos: data.todos || [],
+                };
+              };
+
+              const readLists = readSnapshot.docs.map(processSharedList);
+              const writeLists = writeSnapshot.docs.map(processSharedList);
+              const adminLists = adminSnapshot.docs.map(processSharedList);
+
+              console.log('Listas compartilhadas (read):', readLists);
+              console.log('Listas compartilhadas (write):', writeLists);
+              console.log('Listas compartilhadas (admin):', adminLists);
+
+              // Combinar todas as listas e remover duplicatas
+              const allLists = [...ownerLists, ...readLists, ...writeLists, ...adminLists]
+                .filter((list, index, self) => 
+                  index === self.findIndex((t) => t.id === list.id)
+                );
+
+              console.log('Total de listas após combinar:', allLists.length);
+              console.log('Todas as listas:', allLists);
+
+              setLists(allLists);
+              setLoading(false);
             });
 
-            // Remove duplicatas (caso uma lista seja tanto do usuário quanto compartilhada)
-            const allLists = [...ownerLists, ...sharedLists].filter((list, index, self) =>
-              index === self.findIndex((t) => t.id === list.id)
-            );
-            
-            console.log('Todas as listas:', allLists);
-            setLists(allLists);
-            setLoading(false);
-          },
-          (error) => {
-            console.error('Error fetching shared lists:', error);
-            setError('Failed to load lists. Please try again later.');
-            setLoading(false);
-          }
-        );
+            return () => unsubscribeAdmin();
+          });
 
-        return () => unsubscribeShared();
+          return () => unsubscribeWrite();
+        });
+
+        return () => unsubscribeRead();
       },
       (error) => {
-        console.error('Error fetching owner lists:', error);
+        console.error('Error fetching lists:', error);
         setError('Failed to load lists. Please try again later.');
         setLoading(false);
       }

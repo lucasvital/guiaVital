@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc, Timestamp, DocumentData } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc, Timestamp, DocumentData, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { Priority } from '../types/todo';
@@ -119,26 +119,93 @@ export function useTodos() {
     setLoading(true);
     setError(null);
 
-    const q = query(
-      collection(db, 'todos'),
-      where('ownerId', '==', user.uid)
+    // Primeiro, buscar as listas compartilhadas com o usuário
+    const listsRef = collection(db, 'lists');
+    const listsQuery = query(
+      listsRef,
+      where('sharedWith', 'array-contains', { email: user.email, permission: 'read' })
     );
 
-    const unsubscribe = onSnapshot(
-      q,
-      (querySnapshot) => {
-        const todosData = querySnapshot.docs.map(convertFirestoreToTodo);
-        setTodos(todosData);
-        setLoading(false);
-      },
-      (error) => {
-        console.error('Error fetching todos:', error);
-        setError('Failed to load todos. Please try again later.');
-        setLoading(false);
-      }
-    );
+    // Buscar IDs das listas compartilhadas
+    const unsubscribeLists = onSnapshot(listsQuery, async (listsSnapshot) => {
+      // Buscar todas as listas compartilhadas (read, write, admin)
+      const sharedListsQuery = query(
+        collection(db, 'lists'),
+        where('sharedWith', 'array-contains', { email: user.email })
+      );
 
-    return () => unsubscribe();
+      const sharedListsSnapshot = await getDocs(sharedListsQuery);
+      const sharedListIds = sharedListsSnapshot.docs.map(doc => doc.id);
+
+      console.log('IDs das listas compartilhadas:', sharedListIds);
+
+      // Query para tarefas próprias do usuário
+      const ownTodosQuery = query(
+        collection(db, 'todos'),
+        where('ownerId', '==', user.uid)
+      );
+
+      // Query para tarefas das listas compartilhadas
+      const sharedTodosQuery = query(
+        collection(db, 'todos'),
+        where('list', 'in', sharedListIds.length > 0 ? sharedListIds : ['no-lists'])
+      );
+
+      // Combinar os resultados das duas queries
+      const unsubscribeOwnTodos = onSnapshot(
+        ownTodosQuery,
+        (ownTodosSnapshot) => {
+          const unsubscribeSharedTodos = onSnapshot(
+            sharedTodosQuery,
+            (sharedTodosSnapshot) => {
+              console.log('Tarefas próprias encontradas:', ownTodosSnapshot.docs.length);
+              console.log('Tarefas compartilhadas encontradas:', sharedTodosSnapshot.docs.length);
+
+              const ownTodos = ownTodosSnapshot.docs.map(doc => {
+                const todo = convertFirestoreToTodo(doc);
+                console.log('Tarefa própria:', todo);
+                return todo;
+              });
+
+              const sharedTodos = sharedTodosSnapshot.docs.map(doc => {
+                const todo = convertFirestoreToTodo(doc);
+                console.log('Tarefa compartilhada:', todo);
+                return todo;
+              });
+
+              // Combinar e remover duplicatas
+              const allTodos = [...ownTodos, ...sharedTodos].filter((todo, index, self) =>
+                index === self.findIndex((t) => t.id === todo.id)
+              );
+
+              console.log('Total de tarefas após combinar:', allTodos.length);
+              setTodos(allTodos);
+              setLoading(false);
+            },
+            (error) => {
+              console.error('Error fetching shared todos:', error);
+              setError('Failed to load todos. Please try again later.');
+              setLoading(false);
+            }
+          );
+
+          return () => unsubscribeSharedTodos();
+        },
+        (error) => {
+          console.error('Error fetching own todos:', error);
+          setError('Failed to load todos. Please try again later.');
+          setLoading(false);
+        }
+      );
+
+      return () => {
+        unsubscribeOwnTodos();
+      };
+    });
+
+    return () => {
+      unsubscribeLists();
+    };
   }, [user]);
 
   const addTodo = async (todo: Partial<Todo>) => {

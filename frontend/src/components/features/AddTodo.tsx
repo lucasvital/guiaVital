@@ -59,7 +59,9 @@ export function AddTodo({ onClose, listId }: AddTodoProps) {
         list: selectedListId === 'none' ? null : selectedListId,
       };
 
-      await addDoc(collection(db, 'todos'), firestoreTodo);
+      console.log('Criando tarefa:', firestoreTodo);
+      const docRef = await addDoc(collection(db, 'todos'), firestoreTodo);
+      console.log('Tarefa criada com ID:', docRef.id);
 
       // Limpar o formulário e fechar
       setText('');
